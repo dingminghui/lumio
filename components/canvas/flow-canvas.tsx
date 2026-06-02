@@ -185,6 +185,8 @@ export function FlowCanvas() {
     handleZoomOut();
   });
 
+  const isCanvasEmpty = nodes.length === 0;
+
   return (
     <ReactFlow
       style={{ background: bgColor }}
@@ -207,6 +209,11 @@ export function FlowCanvas() {
           gap={24}
           variant={BackgroundVariant.Dots}
         />
+      ) : null}
+      {isCanvasEmpty ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-medium text-muted-foreground">
+          输入你的想法开始创作
+        </div>
       ) : null}
       {showMinimap ? (
         <MiniMap
