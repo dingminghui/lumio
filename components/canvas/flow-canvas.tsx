@@ -5,8 +5,6 @@ import {
   addEdge,
   Background,
   BackgroundVariant,
-  Controls,
-  MiniMap,
   ReactFlow,
   useEdgesState,
   useNodesState,
@@ -18,15 +16,13 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 
-import { CanvasToolbar } from "@/components/canvas/canvas-toolbar";
 import { defaultEdges, defaultNodes } from "@/components/canvas/default-flow";
 import { FLOW_STORAGE_KEY, isFlowSnapshot } from "@/components/canvas/flow-storage";
 
 export function FlowCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState(defaultNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(defaultEdges);
-  const { fitView, getEdges, getNodes, getViewport, screenToFlowPosition, setViewport } =
-    useReactFlow();
+  const { getEdges, getNodes, getViewport, setViewport } = useReactFlow();
 
   const persistFlow = useCallback(() => {
     requestAnimationFrame(() => {
@@ -86,34 +82,6 @@ export function FlowCanvas() {
     [persistFlow, setEdges],
   );
 
-  const handleAddNode = useCallback(() => {
-    const position = screenToFlowPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    });
-
-    setNodes((currentNodes) => [
-      ...currentNodes,
-      {
-        id: `node-${Date.now()}`,
-        data: { label: `Node ${currentNodes.length + 1}` },
-        position,
-      },
-    ]);
-    persistFlow();
-  }, [persistFlow, screenToFlowPosition, setNodes]);
-
-  const handleReset = useCallback(() => {
-    setNodes(defaultNodes);
-    setEdges(defaultEdges);
-    setViewport({ x: 0, y: 0, zoom: 1 });
-    window.localStorage.removeItem(FLOW_STORAGE_KEY);
-  }, [setEdges, setNodes, setViewport]);
-
-  const handleFitView = useCallback(() => {
-    fitView({ padding: 0.3, duration: 240 });
-  }, [fitView]);
-
   return (
     <ReactFlow
       nodes={nodes}
@@ -130,13 +98,6 @@ export function FlowCanvas() {
       proOptions={{ hideAttribution: true }}
     >
       <Background color="#d4d4d8" gap={24} variant={BackgroundVariant.Dots} />
-      <Controls position="bottom-left" />
-      <MiniMap pannable zoomable position="bottom-right" />
-      <CanvasToolbar
-        onAddNode={handleAddNode}
-        onFitView={handleFitView}
-        onReset={handleReset}
-      />
     </ReactFlow>
   );
 }
