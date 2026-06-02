@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   addEdge,
   Background,
@@ -16,12 +16,18 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 
+import { CanvasHeader } from "@/components/canvas/canvas-header";
 import { defaultEdges, defaultNodes } from "@/components/canvas/default-flow";
-import { FLOW_STORAGE_KEY, isFlowSnapshot } from "@/components/canvas/flow-storage";
+import {
+  DEFAULT_BOARD_NAME,
+  FLOW_STORAGE_KEY,
+  isFlowSnapshot,
+} from "@/components/canvas/flow-storage";
 
 export function FlowCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState(defaultNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(defaultEdges);
+  const [boardName, setBoardName] = useState(DEFAULT_BOARD_NAME);
   const { getEdges, getNodes, getViewport, setViewport } = useReactFlow();
 
   const persistFlow = useCallback(() => {
@@ -32,10 +38,11 @@ export function FlowCanvas() {
           nodes: getNodes(),
           edges: getEdges(),
           viewport: getViewport(),
+          name: boardName,
         }),
       );
     });
-  }, [getEdges, getNodes, getViewport]);
+  }, [boardName, getEdges, getNodes, getViewport]);
 
   const handleInit = useCallback(() => {
     const savedFlow = window.localStorage.getItem(FLOW_STORAGE_KEY);
@@ -47,6 +54,7 @@ export function FlowCanvas() {
         if (isFlowSnapshot(parsed)) {
           setNodes(parsed.nodes);
           setEdges(parsed.edges);
+          setBoardName(parsed.name ?? DEFAULT_BOARD_NAME);
 
           if (parsed.viewport) {
             requestAnimationFrame(() => setViewport(parsed.viewport));
@@ -98,6 +106,7 @@ export function FlowCanvas() {
       proOptions={{ hideAttribution: true }}
     >
       <Background color="#d4d4d8" gap={24} variant={BackgroundVariant.Dots} />
+      <CanvasHeader boardName={boardName} />
     </ReactFlow>
   );
 }
