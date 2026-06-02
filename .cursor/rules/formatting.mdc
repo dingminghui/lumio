@@ -1,0 +1,36 @@
+---
+description: Code formatting conventions for Lumio (Prettier, ESLint, EditorConfig)
+alwaysApply: true
+---
+
+# Formatting
+
+Match project tooling; do not invent alternate style.
+
+## Tools
+
+- **Prettier** (`prettier.config.mjs`): primary formatter; run `pnpm format` before large commits.
+- **ESLint** (`eslint.config.mjs`): lint only; `eslint-config-prettier` disables style rules that conflict with Prettier.
+- **EditorConfig** (`.editorconfig`): 2 spaces, LF, UTF-8, final newline.
+
+## Prettier defaults
+
+- Double quotes, semicolons, trailing commas (`all`)
+- `printWidth`: 88
+- Tailwind class order via `prettier-plugin-tailwindcss` (`tailwindStylesheet`: `app/globals.css`)
+
+## Stack conventions
+
+- TypeScript strict mode; prefer `type` imports where applicable
+- Path alias: `@/*` (see `tsconfig.json`, `components.json`)
+- React 19 / Next.js App Router; client components use `"use client"` when needed
+- shadcn/ui + Tailwind v4; keep `cn()` utility for class merging
+
+## Commands
+
+```bash
+pnpm format        # write formatted files
+pnpm format:check  # CI-friendly check
+pnpm lint          # ESLint
+pnpm lint:fix      # ESLint with autofix
+```
