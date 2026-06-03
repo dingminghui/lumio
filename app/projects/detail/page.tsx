@@ -1,5 +1,5 @@
-import { CanvasHome } from "@/components/canvas/canvas-home";
+import { redirect } from "next/navigation";
 
 export default function ProjectDetailRoute() {
-  return <CanvasHome />;
+  redirect("/projects");
 }

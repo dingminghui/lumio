@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
   Background,
   BackgroundVariant,
   MiniMap,
@@ -15,28 +17,53 @@ import {
   type EdgeChange,
   type Node,
   type NodeChange,
+  Panel,
 } from "@xyflow/react";
+import { MessageSquareIcon } from "lucide-react";
 
-import { CanvasHeader } from "@/components/canvas/canvas-header";
+import { updateProjectFlowAction } from "@/app/projects/actions";
 import { CanvasControls } from "@/components/canvas/canvas-controls";
-import { defaultEdges, defaultNodes } from "@/components/canvas/default-flow";
-import { useKey } from "@/hooks/use-key";
-import { deriveDotColor, isHexColor } from "@/utils/canvas";
+import { CanvasHeader } from "@/components/canvas/canvas-header";
 import {
   DEFAULT_BG_COLOR,
-  DEFAULT_BOARD_NAME,
+  DEFAULT_FLOW_SNAPSHOT,
   DEFAULT_SHOW_DOTS,
-  FLOW_STORAGE_KEY,
   type FlowSnapshot,
-  isFlowSnapshot,
-} from "@/components/canvas/flow-storage";
+} from "@/utils/flow-snapshot";
+import { Button } from "@/components/ui/button";
+import { useKey } from "@/hooks/use-key";
+import { deriveDotColor, isHexColor } from "@/utils/canvas";
 
-export function FlowCanvas() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(defaultNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(defaultEdges);
-  const [boardName, setBoardName] = useState(DEFAULT_BOARD_NAME);
-  const [bgColor, setBgColor] = useState(DEFAULT_BG_COLOR);
-  const [showDots, setShowDots] = useState(DEFAULT_SHOW_DOTS);
+type FlowCanvasProps = {
+  projectId: string;
+  boardName: string;
+  initialSnapshot: FlowSnapshot;
+  isSessionPanelOpen: boolean;
+  onToggleSessionPanel: () => void;
+};
+
+export function FlowCanvas({
+  projectId,
+  boardName,
+  initialSnapshot,
+  isSessionPanelOpen,
+  onToggleSessionPanel,
+}: FlowCanvasProps) {
+  const initialFlowSnapshot = useMemo(
+    () => ({
+      ...DEFAULT_FLOW_SNAPSHOT,
+      ...initialSnapshot,
+    }),
+    [initialSnapshot],
+  );
+  const [nodes, setNodes] = useNodesState(initialFlowSnapshot.nodes);
+  const [edges, setEdges] = useEdgesState(initialFlowSnapshot.edges);
+  const [bgColor, setBgColor] = useState(
+    isHexColor(initialFlowSnapshot.bgColor) ? initialFlowSnapshot.bgColor : DEFAULT_BG_COLOR,
+  );
+  const [showDots, setShowDots] = useState(
+    initialFlowSnapshot.showDots ?? DEFAULT_SHOW_DOTS,
+  );
   const [showMinimap, setShowMinimap] = useState(false);
   const { fitView, getEdges, getNodes, getViewport, setViewport, zoomIn, zoomOut } =
     useReactFlow();
@@ -44,66 +71,59 @@ export function FlowCanvas() {
   const persistFlow = useCallback(
     (overrides?: Partial<FlowSnapshot>) => {
       requestAnimationFrame(() => {
-        window.localStorage.setItem(
-          FLOW_STORAGE_KEY,
-          JSON.stringify({
-            nodes: overrides?.nodes ?? getNodes(),
-            edges: overrides?.edges ?? getEdges(),
-            viewport: overrides?.viewport ?? getViewport(),
-            name: overrides?.name ?? boardName,
-            bgColor: overrides?.bgColor ?? bgColor,
-            showDots: overrides?.showDots ?? showDots,
-          }),
-        );
+        void updateProjectFlowAction(projectId, {
+          nodes: overrides?.nodes ?? getNodes(),
+          edges: overrides?.edges ?? getEdges(),
+          viewport: overrides?.viewport ?? getViewport(),
+          name: boardName,
+          bgColor: overrides?.bgColor ?? bgColor,
+          showDots: overrides?.showDots ?? showDots,
+        });
       });
     },
-    [bgColor, boardName, getEdges, getNodes, getViewport, showDots],
+    [bgColor, boardName, getEdges, getNodes, getViewport, projectId, showDots],
   );
 
   const handleInit = useCallback(() => {
-    const savedFlow = window.localStorage.getItem(FLOW_STORAGE_KEY);
+    const viewport = initialFlowSnapshot.viewport;
 
-    if (savedFlow) {
-      try {
-        const parsed = JSON.parse(savedFlow);
-
-        if (isFlowSnapshot(parsed)) {
-          setNodes(parsed.nodes);
-          setEdges(parsed.edges);
-          setBoardName(parsed.name ?? DEFAULT_BOARD_NAME);
-          setBgColor(isHexColor(parsed.bgColor) ? parsed.bgColor : DEFAULT_BG_COLOR);
-          setShowDots(parsed.showDots ?? DEFAULT_SHOW_DOTS);
-
-          if (parsed.viewport) {
-            requestAnimationFrame(() => setViewport(parsed.viewport));
-          }
-        }
-      } catch {
-        window.localStorage.removeItem(FLOW_STORAGE_KEY);
-      }
+    if (viewport) {
+      requestAnimationFrame(() => setViewport(viewport));
     }
-  }, [setEdges, setNodes, setViewport]);
+  }, [initialFlowSnapshot.viewport, setViewport]);
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<Node>[]) => {
-      onNodesChange(changes);
-      persistFlow();
+      setNodes((currentNodes) => {
+        const nextNodes = applyNodeChanges(changes, currentNodes);
+        persistFlow({ nodes: nextNodes });
+
+        return nextNodes;
+      });
     },
-    [onNodesChange, persistFlow],
+    [persistFlow, setNodes],
   );
 
   const handleEdgesChange = useCallback(
     (changes: EdgeChange<Edge>[]) => {
-      onEdgesChange(changes);
-      persistFlow();
+      setEdges((currentEdges) => {
+        const nextEdges = applyEdgeChanges(changes, currentEdges);
+        persistFlow({ edges: nextEdges });
+
+        return nextEdges;
+      });
     },
-    [onEdgesChange, persistFlow],
+    [persistFlow, setEdges],
   );
 
   const handleConnect = useCallback(
     (connection: Connection) => {
-      setEdges((currentEdges) => addEdge(connection, currentEdges));
-      persistFlow();
+      setEdges((currentEdges) => {
+        const nextEdges = addEdge(connection, currentEdges);
+        persistFlow({ edges: nextEdges });
+
+        return nextEdges;
+      });
     },
     [persistFlow, setEdges],
   );
@@ -224,6 +244,17 @@ export function FlowCanvas() {
         />
       ) : null}
       <CanvasHeader boardName={boardName} />
+      <Panel position="top-right" className="rounded-md p-1 backdrop-blur">
+        <Button
+          type="button"
+          variant={isSessionPanelOpen ? "default" : "secondary"}
+          aria-pressed={isSessionPanelOpen}
+          onClick={onToggleSessionPanel}
+        >
+          <MessageSquareIcon data-icon="inline-start" />
+          会话
+        </Button>
+      </Panel>
       <CanvasControls
         bgColor={bgColor}
         onBgColorChange={handleBgColorChange}

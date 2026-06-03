@@ -1,35 +1,20 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Lottie, { type LottieRefCurrentProps } from "lottie-react";
-import { useRef } from "react";
+import { type ReactNode } from "react";
 
 import newProjectAnimation from "@/assets/lottie/1.json";
 import homeAnimation from "@/assets/lottie/2.json";
 import projectsAnimation from "@/assets/lottie/3.json";
 import settingsAnimation from "@/assets/lottie/4.json";
 import profileAnimation from "@/assets/lottie/5.json";
-import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { AppNavItem, type AppNavItemConfig } from "@/components/app-nav-item";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
-type NavItemConfig = {
-  label: string;
-  href: string;
-  aliases: readonly string[];
-  animationData: unknown;
-  opensInNewTab?: boolean;
-};
-
-const navItems: NavItemConfig[] = [
+const navItems: AppNavItemConfig[] = [
   {
     label: "新建项目",
-    href: "/projects/detail",
+    href: "/projects/new",
     aliases: [],
     animationData: newProjectAnimation,
     opensInNewTab: true,
@@ -44,6 +29,7 @@ const navItems: NavItemConfig[] = [
     label: "项目",
     href: "/projects",
     aliases: [],
+    activePrefixes: ["/projects/"],
     animationData: projectsAnimation,
   },
   {
@@ -60,11 +46,19 @@ const navItems: NavItemConfig[] = [
   },
 ];
 
+function isNavItemActive(item: AppNavItemConfig, pathname: string) {
+  return (
+    item.href === pathname ||
+    item.aliases.includes(pathname) ||
+    (item.activePrefixes?.some((prefix) => pathname.startsWith(prefix)) ?? false)
+  );
+}
+
 type AppShellProps = {
-  title: string;
+  children?: ReactNode;
 };
 
-export function AppShell({ title }: AppShellProps) {
+export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
 
   return (
@@ -80,66 +74,18 @@ export function AppShell({ title }: AppShellProps) {
           </div>
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
-              const isActive = item.href === pathname || item.aliases.includes(pathname);
-
-              return <NavItem key={item.href} item={item} isActive={isActive} />;
+              return (
+                <AppNavItem
+                  key={item.href}
+                  item={item}
+                  isActive={isNavItemActive(item, pathname)}
+                />
+              );
             })}
           </nav>
         </aside>
       </TooltipProvider>
-      <section className="flex min-w-0 flex-1 items-center justify-center px-8 py-10">
-        <h1 className="text-3xl font-semibold tracking-normal">{title}</h1>
-      </section>
+      <section className="flex min-w-0 flex-1 px-8 py-10">{children}</section>
     </main>
-  );
-}
-
-type NavItemProps = {
-  item: NavItemConfig;
-  isActive: boolean;
-};
-
-function NavItem({ item, isActive }: NavItemProps) {
-  const lottieRef = useRef<LottieRefCurrentProps | null>(null);
-
-  function playAnimation() {
-    lottieRef.current?.goToAndPlay(0, true);
-  }
-
-  function stopAnimation() {
-    lottieRef.current?.goToAndStop(0, true);
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Link
-          href={item.href}
-          target={item.opensInNewTab ? "_blank" : undefined}
-          rel={item.opensInNewTab ? "noreferrer" : undefined}
-          aria-label={item.label}
-          onBlur={stopAnimation}
-          onFocus={playAnimation}
-          onMouseEnter={playAnimation}
-          onMouseLeave={stopAnimation}
-          className={cn(
-            "flex size-12 items-center justify-center rounded-lg transition-colors",
-            "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
-          )}
-        >
-          <Lottie
-            lottieRef={lottieRef}
-            animationData={item.animationData}
-            autoplay={false}
-            loop={false}
-            className="size-8"
-          />
-        </Link>
-      </TooltipTrigger>
-      <TooltipContent side="right" sideOffset={8}>
-        {item.label}
-      </TooltipContent>
-    </Tooltip>
   );
 }

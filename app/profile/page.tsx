@@ -1,5 +1,10 @@
 import { AppShell } from "@/components/app-shell";
+import { RoutePlaceholder } from "@/components/route-placeholder";
 
 export default function ProfileRoute() {
-  return <AppShell title="我的" />;
+  return (
+    <AppShell>
+      <RoutePlaceholder text="我的" />
+    </AppShell>
+  );
 }
