@@ -9,6 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import type { ProjectState } from "@/types/skill";
 import { DEFAULT_FLOW_SNAPSHOT, type FlowSnapshot } from "@/utils/flow-snapshot";
 import { SESSION_MESSAGE_ROLES } from "@/utils/session-message";
 
@@ -22,6 +23,8 @@ export const sessionMessageRole = pgEnum("session_message_role", SESSION_MESSAGE
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull().default("Untitled"),
+  skillId: text("skill_id"),
+  projectState: jsonb("project_state").$type<ProjectState>(),
   flowSnapshot: jsonb("flow_snapshot")
     .$type<FlowSnapshot>()
     .notNull()

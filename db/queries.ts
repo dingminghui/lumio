@@ -65,6 +65,8 @@ export async function getProjectDetail(projectId: string) {
     .select({
       id: projects.id,
       name: projects.name,
+      skillId: projects.skillId,
+      projectState: projects.projectState,
       flowSnapshot: projects.flowSnapshot,
     })
     .from(projects)
@@ -120,6 +122,8 @@ export async function getProjectDetail(projectId: string) {
     project: {
       id: project.id,
       name: project.name,
+      skillId: project.skillId,
+      projectState: project.projectState,
       flowSnapshot: normalizeFlowSnapshot(project.flowSnapshot),
     },
     sessions: sessions.map((session) => ({
