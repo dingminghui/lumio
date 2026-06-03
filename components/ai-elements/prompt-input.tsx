@@ -124,7 +124,9 @@ export function PromptInputFooter({ className, ...props }: PromptInputFooterProp
 export type PromptInputToolsProps = HTMLAttributes<HTMLDivElement>;
 
 export function PromptInputTools({ className, ...props }: PromptInputToolsProps) {
-  return <div className={cn("flex min-w-0 items-center gap-1", className)} {...props} />;
+  return (
+    <div className={cn("flex min-w-0 items-center gap-1", className)} {...props} />
+  );
 }
 
 export type PromptInputButtonProps = ComponentProps<typeof InputGroupButton>;

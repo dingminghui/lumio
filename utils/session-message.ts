@@ -36,9 +36,8 @@ export function toStoredTextMessages(messages: UIMessage[]): StoredTextMessage[]
   const now = new Date().toISOString();
 
   return messages
-    .filter(
-      (message): message is UIMessage & { role: StoredMessageRole } =>
-        isStoredMessageRole(message.role),
+    .filter((message): message is UIMessage & { role: StoredMessageRole } =>
+      isStoredMessageRole(message.role),
     )
     .map((message) => ({
       id: message.id,

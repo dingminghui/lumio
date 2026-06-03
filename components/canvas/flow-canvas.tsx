@@ -59,7 +59,9 @@ export function FlowCanvas({
   const [nodes, setNodes] = useNodesState(initialFlowSnapshot.nodes);
   const [edges, setEdges] = useEdgesState(initialFlowSnapshot.edges);
   const [bgColor, setBgColor] = useState(
-    isHexColor(initialFlowSnapshot.bgColor) ? initialFlowSnapshot.bgColor : DEFAULT_BG_COLOR,
+    isHexColor(initialFlowSnapshot.bgColor)
+      ? initialFlowSnapshot.bgColor
+      : DEFAULT_BG_COLOR,
   );
   const [showDots, setShowDots] = useState(
     initialFlowSnapshot.showDots ?? DEFAULT_SHOW_DOTS,

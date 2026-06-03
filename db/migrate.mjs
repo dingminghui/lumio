@@ -20,7 +20,10 @@ async function loadEnvFile(filePath) {
       }
 
       const key = trimmedLine.slice(0, separatorIndex).trim();
-      const value = trimmedLine.slice(separatorIndex + 1).trim().replace(/^["']|["']$/g, "");
+      const value = trimmedLine
+        .slice(separatorIndex + 1)
+        .trim()
+        .replace(/^["']|["']$/g, "");
 
       process.env[key] ??= value;
     }

@@ -52,7 +52,8 @@ export function SessionListPopover({
                 className={cn(
                   "flex h-8 items-center rounded-lg px-2 text-left text-sm transition-colors",
                   "hover:bg-muted hover:text-foreground",
-                  session.id === activeSessionId && "bg-muted font-medium text-foreground",
+                  session.id === activeSessionId &&
+                    "bg-muted font-medium text-foreground",
                 )}
               >
                 <span className="truncate">{session.title}</span>

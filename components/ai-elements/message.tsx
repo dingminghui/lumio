@@ -34,7 +34,7 @@ export function MessageContent({ children, className, ...props }: MessageContent
   return (
     <div
       className={cn(
-        "min-w-0 max-w-full overflow-hidden text-sm",
+        "max-w-full min-w-0 overflow-hidden text-sm",
         "group-[.is-user]:rounded-lg group-[.is-user]:bg-primary group-[.is-user]:px-3 group-[.is-user]:py-2 group-[.is-user]:text-primary-foreground",
         "group-[.is-assistant]:text-foreground",
         className,
@@ -57,7 +57,7 @@ export const MessageResponse = memo(function MessageResponse({
   return (
     <Streamdown
       className={cn(
-        "max-w-none leading-6 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-primary [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_pre]:my-3 [&_ul]:ml-5 [&_ul]:list-disc",
+        "max-w-none leading-6 [&_a]:text-primary [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_pre]:my-3 [&_ul]:ml-5 [&_ul]:list-disc [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className,
       )}
       plugins={streamdownPlugins}

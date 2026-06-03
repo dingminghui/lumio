@@ -24,11 +24,13 @@ export function Conversation({ className, ...props }: ConversationProps) {
 
 export type ConversationContentProps = ComponentProps<typeof StickToBottom.Content>;
 
-export function ConversationContent({
-  className,
-  ...props
-}: ConversationContentProps) {
-  return <StickToBottom.Content className={cn("flex flex-col gap-4 p-4", className)} {...props} />;
+export function ConversationContent({ className, ...props }: ConversationContentProps) {
+  return (
+    <StickToBottom.Content
+      className={cn("flex flex-col gap-4 p-4", className)}
+      {...props}
+    />
+  );
 }
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
@@ -51,7 +53,9 @@ export function ConversationEmptyState({
       {...props}
     >
       <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-      {description ? <p className="text-xs text-muted-foreground/80">{description}</p> : null}
+      {description ? (
+        <p className="text-xs text-muted-foreground/80">{description}</p>
+      ) : null}
     </div>
   );
 }

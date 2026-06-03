@@ -15,16 +15,30 @@ type RouteContext = {
 
 export async function POST(request: Request, { params }: RouteContext) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
+  const baseURL = process.env.DEEPSEEK_BASE_URL;
+  const model = process.env.DEEPSEEK_MODEL;
 
   if (!apiKey) {
     return Response.json({ error: "Missing DEEPSEEK_API_KEY" }, { status: 500 });
   }
 
+  if (!baseURL) {
+    return Response.json({ error: "Missing DEEPSEEK_BASE_URL" }, { status: 500 });
+  }
+
+  if (!model) {
+    return Response.json({ error: "Missing DEEPSEEK_MODEL" }, { status: 500 });
+  }
+
   const { projectId, sessionId } = await params;
   const body = (await request.json()) as { messages?: UIMessage[] };
   const messages = body.messages ?? [];
-  const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
-  const userContent = latestUserMessage ? getUiMessageText(latestUserMessage).trim() : "";
+  const latestUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "user");
+  const userContent = latestUserMessage
+    ? getUiMessageText(latestUserMessage).trim()
+    : "";
 
   if (!userContent) {
     return Response.json({ error: "Message content is required" }, { status: 400 });
@@ -40,7 +54,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   const deepseek = createOpenAICompatible({
     name: "deepseek",
     apiKey,
-    baseURL: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
+    baseURL,
     transformRequestBody: (requestBody) => ({
       ...requestBody,
       thinking: { type: "disabled" },
@@ -48,7 +62,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   });
 
   const result = streamText({
-    model: deepseek.chatModel(process.env.DEEPSEEK_MODEL || "deepseek-v4-flash"),
+    model: deepseek.chatModel(model),
     messages: await convertToModelMessages(messages),
     onFinish: async ({ text }) => {
       if (!text.trim()) {

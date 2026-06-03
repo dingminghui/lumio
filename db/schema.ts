@@ -17,10 +17,7 @@ const defaultFlowSnapshotJson = JSON.stringify(DEFAULT_FLOW_SNAPSHOT).replaceAll
   "''",
 );
 
-export const sessionMessageRole = pgEnum(
-  "session_message_role",
-  SESSION_MESSAGE_ROLES,
-);
+export const sessionMessageRole = pgEnum("session_message_role", SESSION_MESSAGE_ROLES);
 
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),

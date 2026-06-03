@@ -1,12 +1,7 @@
 "use client";
 
 import { PanelRightCloseIcon } from "lucide-react";
-import {
-  type Dispatch,
-  type SetStateAction,
-  useState,
-  useTransition,
-} from "react";
+import { type Dispatch, type SetStateAction, useState, useTransition } from "react";
 
 import { createProjectSessionAction } from "@/app/projects/actions";
 import { SessionChat } from "@/components/canvas/session-chat";
