@@ -135,7 +135,10 @@ export function TextNode({ data, selected }: NodeProps) {
         ref={nodeCardRef}
         onBlurCapture={handleCardBlurCapture}
         className={cn(
-          "flex h-full w-full cursor-grab flex-col overflow-hidden rounded-xl border border-transparent bg-card text-card-foreground shadow-xs transition-[border-color,box-shadow] active:cursor-grabbing",
+          "flex h-full w-full flex-col overflow-hidden rounded-xl border border-transparent bg-card text-card-foreground shadow-xs transition-[border-color,box-shadow]",
+          isActiveEdit
+            ? "cursor-default active:cursor-default"
+            : "cursor-grab active:cursor-grabbing",
           selected
             ? "border-primary shadow-md ring-2 ring-primary/20"
             : "border-transparent",

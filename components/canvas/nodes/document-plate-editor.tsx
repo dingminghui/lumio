@@ -15,6 +15,7 @@ import {
   Redo2,
   Undo2,
 } from "lucide-react";
+import { ListStyleType, toggleList } from "@platejs/list";
 import type { PlateEditor } from "platejs/react";
 import { Plate, PlateContent, usePlateEditor } from "platejs/react";
 
@@ -61,37 +62,6 @@ function focusPlateContent(root: HTMLElement | null) {
   editableEl.scrollTop = 0;
 }
 
-function toggleListMarker(editor: PlateEditor, marker: "ordered" | "unordered") {
-  const block = editor.api.block();
-
-  if (!block) {
-    editor.tf.insertText(marker === "ordered" ? "1. " : "- ");
-
-    return;
-  }
-
-  const [, path] = block;
-  const text = editor.api.string(path);
-  const orderedPattern = /^\d+\.\s+/;
-  const unorderedPattern = /^[-*]\s+/;
-  const pattern = marker === "ordered" ? orderedPattern : unorderedPattern;
-  const prefix = marker === "ordered" ? "1. " : "- ";
-  const nextText = pattern.test(text) ? text.replace(pattern, "") : `${prefix}${text}`;
-  const start = editor.api.start(path);
-  const end = editor.api.end(path);
-
-  if (!start || !end) {
-    return;
-  }
-
-  editor.tf.select({
-    anchor: start,
-    focus: end,
-  });
-  editor.tf.delete();
-  editor.tf.insertText(nextText);
-}
-
 const TOOLBAR_COMMANDS: ToolbarCommand[] = [
   {
     icon: Heading1,
@@ -132,14 +102,14 @@ const TOOLBAR_COMMANDS: ToolbarCommand[] = [
     icon: List,
     label: "无序列表",
     run: (editor) => {
-      toggleListMarker(editor, "unordered");
+      toggleList(editor, { listStyleType: ListStyleType.Disc });
     },
   },
   {
     icon: ListOrdered,
     label: "有序列表",
     run: (editor) => {
-      toggleListMarker(editor, "ordered");
+      toggleList(editor, { listStyleType: ListStyleType.Decimal });
     },
   },
   {

@@ -18,6 +18,8 @@
     "@ai-sdk/openai-compatible": "^2.0.48",
     "@ai-sdk/react": "^3.0.197",
     "@platejs/basic-nodes": "^53.0.0",
+    "@platejs/indent": "^53.0.0",
+    "@platejs/list": "^53.0.0",
     "@platejs/markdown": "^53.0.4",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@rive-app/react-webgl2": "^4.28.6",
