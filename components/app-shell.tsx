@@ -9,6 +9,7 @@ import projectsAnimation from "@/assets/lottie/3.json";
 import settingsAnimation from "@/assets/lottie/4.json";
 import profileAnimation from "@/assets/lottie/5.json";
 import { AppNavItem, type AppNavItemConfig } from "@/components/app-nav-item";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const navItems: AppNavItemConfig[] = [
@@ -83,6 +84,9 @@ export function AppShell({ children }: AppShellProps) {
               );
             })}
           </nav>
+          <div className="mt-auto">
+            <ThemeToggle />
+          </div>
         </aside>
       </TooltipProvider>
       <section className="flex min-w-0 flex-1 px-8 py-10">{children}</section>

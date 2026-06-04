@@ -1,10 +1,21 @@
 import { AppShell } from "@/components/app-shell";
-import { RoutePlaceholder } from "@/components/route-placeholder";
+import { ProfileSettings } from "@/components/profile/profile-settings";
+import { getProfileSettings } from "@/db/profile-queries";
 
-export default function ProfileRoute() {
+export const dynamic = "force-dynamic";
+
+export default async function ProfileRoute() {
+  const settings = await getProfileSettings();
+
   return (
     <AppShell>
-      <RoutePlaceholder text="我的" />
+      <ProfileSettings
+        profile={settings.profile}
+        modelConfigs={settings.modelConfigs.map((config) => ({
+          ...config,
+          validatedAt: config.validatedAt?.toISOString() ?? null,
+        }))}
+      />
     </AppShell>
   );
 }

@@ -1,0 +1,153 @@
+"use client";
+
+import { useState } from "react";
+
+import {
+  saveUserProfileNameAction,
+  validateAndSaveModelConfigAction,
+} from "@/app/profile/actions";
+import { ModelConfigSection } from "@/components/profile/model-config-section";
+import { PersonalCenterSection } from "@/components/profile/personal-center-section";
+import { ProfileSettingsNav } from "@/components/profile/profile-settings-nav";
+import type {
+  ModelConfigRow,
+  ProfileModelConfig,
+  SaveStatus,
+} from "@/components/profile/profile-settings-types";
+import type { ModelProviderId } from "@/lib/model-providers";
+
+type ProfileSettingsProps = {
+  profile: {
+    name: string;
+  };
+  modelConfigs: ProfileModelConfig[];
+};
+
+function getInitialModelRows(modelConfigs: ProfileModelConfig[]): ModelConfigRow[] {
+  return modelConfigs.map((config) => ({
+    ...config,
+    apiKey: "",
+    status: config.validatedAt ? "saved" : "idle",
+    message: "",
+  }));
+}
+
+export function ProfileSettings({ profile, modelConfigs }: ProfileSettingsProps) {
+  const [name, setName] = useState(profile.name);
+  const [savedName, setSavedName] = useState(profile.name);
+  const [nameStatus, setNameStatus] = useState<SaveStatus>("idle");
+  const [nameMessage, setNameMessage] = useState("");
+  const [rows, setRows] = useState(() => getInitialModelRows(modelConfigs));
+  const [visibleKeys, setVisibleKeys] = useState<Record<ModelProviderId, boolean>>({
+    deepseek: false,
+  });
+
+  async function handleNameBlur() {
+    if (name.trim() === savedName) {
+      return;
+    }
+
+    setNameStatus("saving");
+    setNameMessage("");
+
+    const result = await saveUserProfileNameAction(name);
+
+    if (result.ok) {
+      setSavedName(result.profile.name);
+      setName(result.profile.name);
+      setNameStatus("saved");
+      return;
+    }
+
+    setNameStatus("error");
+    setNameMessage(result.message);
+  }
+
+  function handleNameChange(nextName: string) {
+    setName(nextName);
+    setNameStatus("idle");
+  }
+
+  function updateRow(provider: ModelProviderId, updates: Partial<ModelConfigRow>) {
+    setRows((currentRows) =>
+      currentRows.map((row) =>
+        row.provider === provider ? { ...row, ...updates } : row,
+      ),
+    );
+  }
+
+  async function handleModelSave(provider: ModelProviderId) {
+    const row = rows.find((currentRow) => currentRow.provider === provider);
+
+    if (!row) {
+      return;
+    }
+
+    updateRow(provider, { status: "saving", message: "" });
+
+    const result = await validateAndSaveModelConfigAction(provider, {
+      apiKey: row.apiKey,
+    });
+
+    if (result.ok) {
+      updateRow(provider, {
+        apiKey: "",
+        hasApiKey: result.config.hasApiKey,
+        validatedAt: result.config.validatedAt,
+        status: "saved",
+        message: "",
+      });
+      return;
+    }
+
+    updateRow(provider, {
+      status: "error",
+      message: result.message,
+    });
+  }
+
+  function handleApiKeyChange(provider: ModelProviderId, apiKey: string) {
+    updateRow(provider, {
+      apiKey,
+      status: "idle",
+      message: "",
+    });
+  }
+
+  function toggleKeyVisibility(provider: ModelProviderId) {
+    setVisibleKeys((currentVisibility) => ({
+      ...currentVisibility,
+      [provider]: !currentVisibility[provider],
+    }));
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-[calc(100vw-8rem)] min-w-0 flex-col gap-6 sm:max-w-6xl">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold tracking-normal">我的</h1>
+        <p className="text-sm text-muted-foreground">管理个人信息与模型服务配置。</p>
+      </header>
+
+      <div className="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)]">
+        <ProfileSettingsNav />
+
+        <div className="flex min-w-0 flex-col gap-8">
+          <PersonalCenterSection
+            name={name}
+            status={nameStatus}
+            message={nameMessage}
+            onNameBlur={handleNameBlur}
+            onNameChange={handleNameChange}
+          />
+          <ModelConfigSection
+            rows={rows}
+            visibleKeys={visibleKeys}
+            onApiKeyBlur={handleModelSave}
+            onApiKeyChange={handleApiKeyChange}
+            onKeyVisibilityToggle={toggleKeyVisibility}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

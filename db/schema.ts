@@ -19,6 +19,7 @@ const defaultFlowSnapshotJson = JSON.stringify(DEFAULT_FLOW_SNAPSHOT).replaceAll
 );
 
 export const sessionMessageRole = pgEnum("session_message_role", SESSION_MESSAGE_ROLES);
+export const modelProvider = pgEnum("model_provider", ["deepseek"]);
 
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -60,6 +61,19 @@ export const sessionMessages = pgTable(
   },
   (table) => [index("session_messages_session_id_idx").on(table.sessionId)],
 );
+
+export const userProfile = pgTable("user_profile", {
+  id: text("id").primaryKey().default("default"),
+  name: text("name").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const modelConfigs = pgTable("model_configs", {
+  provider: modelProvider("provider").primaryKey(),
+  apiKeyEncrypted: text("api_key_encrypted").notNull(),
+  validatedAt: timestamp("validated_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const projectsRelations = relations(projects, ({ many }) => ({
   sessions: many(projectSessions),
