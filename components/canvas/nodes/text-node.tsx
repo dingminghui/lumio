@@ -3,8 +3,8 @@
 import "./text-node.css";
 
 import dynamic from "next/dynamic";
-import { PencilLine } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { Check, PencilLine } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Handle, type NodeProps, NodeResizer, Position } from "@xyflow/react";
 
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,12 @@ const DocumentPlateEditor = dynamic(
   },
 );
 
+type DocumentStats = {
+  wordCount: number;
+  characterCount: number;
+  headingCount: number;
+};
+
 export type TextNodeData = {
   skillId: string;
   skillName: string;
@@ -46,6 +52,26 @@ export type TextNodeData = {
   onStartDocumentEdit?: () => void;
 };
 
+function getDocumentStats(markdown: string): DocumentStats {
+  const compactText = markdown.replace(/\s/g, "");
+  const cjkText = compactText.match(
+    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu,
+  );
+  const latinWords = markdown
+    .replace(
+      /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu,
+      " ",
+    )
+    .match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*/g);
+
+  return {
+    wordCount: (cjkText?.length ?? 0) + (latinWords?.length ?? 0),
+    characterCount: compactText.length,
+    headingCount: markdown.split("\n").filter((line) => /^#{1,6}\s+\S/.test(line))
+      .length,
+  };
+}
+
 export function TextNode({ data, selected }: NodeProps) {
   const nodeData = data as TextNodeData;
   const isDocumentNode = isDocumentSkill(nodeData.skillId);
@@ -53,6 +79,10 @@ export function TextNode({ data, selected }: NodeProps) {
   const fallbackContent = getFallbackNodeContent(nodeData.state);
   const [isEditing, setIsEditing] = useState(false);
   const nodeCardRef = useRef<HTMLDivElement>(null);
+  const documentStats = useMemo(
+    () => getDocumentStats(documentMarkdown),
+    [documentMarkdown],
+  );
 
   const isActiveEdit = selected && isEditing;
 
@@ -70,7 +100,8 @@ export function TextNode({ data, selected }: NodeProps) {
     [isActiveEdit, nodeData],
   );
 
-  const handleEditEnd = useCallback(() => {
+  const handleEditEnd = useCallback((event?: React.MouseEvent) => {
+    event?.stopPropagation();
     setIsEditing(false);
   }, []);
 
@@ -114,7 +145,18 @@ export function TextNode({ data, selected }: NodeProps) {
           <Badge variant="secondary" className="w-fit text-xs">
             {nodeData.skillName}
           </Badge>
-          {isDocumentNode && !isActiveEdit ? (
+          {isDocumentNode && isActiveEdit ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="xs"
+              className="nodrag h-6 shrink-0 px-2 text-xs"
+              onClick={handleEditEnd}
+            >
+              <Check className="size-3" />
+              完成
+            </Button>
+          ) : isDocumentNode ? (
             <Button
               type="button"
               variant="ghost"
@@ -129,7 +171,7 @@ export function TextNode({ data, selected }: NodeProps) {
           ) : null}
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col px-3 pt-2 pb-3">
+        <div className="flex min-h-0 flex-1 flex-col px-3 pt-2 pb-2">
           {isDocumentNode ? (
             <DocumentPlateEditor
               markdown={documentMarkdown}
@@ -154,6 +196,18 @@ export function TextNode({ data, selected }: NodeProps) {
             </p>
           )}
         </div>
+
+        {isDocumentNode ? (
+          <div className="flex shrink-0 justify-end border-t border-border/50 px-3 py-1.5 text-[11px] leading-none text-muted-foreground">
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
+              <span>{isActiveEdit ? "编辑中" : "只读"}</span>
+              <span>已同步</span>
+              <span>字数 {documentStats.wordCount}</span>
+              <span>字符 {documentStats.characterCount}</span>
+              <span>标题 {documentStats.headingCount}</span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <Handle
