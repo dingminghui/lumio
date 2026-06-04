@@ -1,65 +1,94 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   jsonb,
   pgEnum,
   pgTable,
+  real,
   text,
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { Viewport } from "@xyflow/react";
 
-import type { ProjectState } from "@/types/skill";
-import { DEFAULT_FLOW_SNAPSHOT, type FlowSnapshot } from "@/utils/flow-snapshot";
+import { DEFAULT_BG_COLOR, DEFAULT_SHOW_DOTS } from "@/utils/flow-snapshot";
 import { SESSION_MESSAGE_ROLES } from "@/utils/session-message";
 
-const defaultFlowSnapshotJson = JSON.stringify(DEFAULT_FLOW_SNAPSHOT).replaceAll(
+const defaultViewportJson = JSON.stringify({ x: 0, y: 0, zoom: 1 }).replaceAll(
   "'",
   "''",
 );
 
-export const sessionMessageRole = pgEnum("session_message_role", SESSION_MESSAGE_ROLES);
+export const messageRole = pgEnum("message_role", SESSION_MESSAGE_ROLES);
 export const modelProvider = pgEnum("model_provider", ["deepseek"]);
 
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull().default("Untitled"),
-  skillId: text("skill_id"),
-  projectState: jsonb("project_state").$type<ProjectState>(),
-  flowSnapshot: jsonb("flow_snapshot")
-    .$type<FlowSnapshot>()
+  viewport: jsonb("viewport")
+    .$type<Viewport>()
     .notNull()
-    .default(sql.raw(`'${defaultFlowSnapshotJson}'::jsonb`)),
+    .default(sql.raw(`'${defaultViewportJson}'::jsonb`)),
+  bgColor: text("bg_color").notNull().default(DEFAULT_BG_COLOR),
+  showDots: boolean("show_dots").notNull().default(DEFAULT_SHOW_DOTS),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const projectSessions = pgTable(
-  "project_sessions",
+export const canvasItems = pgTable(
+  "canvas_items",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    title: text("title").notNull().default("默认会话"),
+    skillId: text("skill_id").notNull(),
+    state: jsonb("state").$type<Record<string, unknown>>().notNull().default({}),
+    positionX: real("position_x").notNull().default(0),
+    positionY: real("position_y").notNull().default(0),
+    width: real("width").notNull().default(400),
+    height: real("height").notNull().default(120),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("project_sessions_project_id_idx").on(table.projectId)],
+  (table) => [index("canvas_items_project_id_idx").on(table.projectId)],
 );
 
-export const sessionMessages = pgTable(
-  "session_messages",
+export const canvasEdges = pgTable(
+  "canvas_edges",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    sessionId: uuid("session_id")
+    projectId: uuid("project_id")
       .notNull()
-      .references(() => projectSessions.id, { onDelete: "cascade" }),
-    role: sessionMessageRole("role").notNull(),
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sourceItemId: uuid("source_item_id")
+      .notNull()
+      .references(() => canvasItems.id, { onDelete: "cascade" }),
+    targetItemId: uuid("target_item_id")
+      .notNull()
+      .references(() => canvasItems.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("canvas_edges_project_id_idx").on(table.projectId),
+    index("canvas_edges_source_item_id_idx").on(table.sourceItemId),
+    index("canvas_edges_target_item_id_idx").on(table.targetItemId),
+  ],
+);
+
+export const itemMessages = pgTable(
+  "item_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => canvasItems.id, { onDelete: "cascade" }),
+    role: messageRole("role").notNull(),
     content: text("content").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("session_messages_session_id_idx").on(table.sessionId)],
+  (table) => [index("item_messages_item_id_idx").on(table.itemId)],
 );
 
 export const userProfile = pgTable("user_profile", {
@@ -76,20 +105,28 @@ export const modelConfigs = pgTable("model_configs", {
 });
 
 export const projectsRelations = relations(projects, ({ many }) => ({
-  sessions: many(projectSessions),
+  items: many(canvasItems),
+  edges: many(canvasEdges),
 }));
 
-export const projectSessionsRelations = relations(projectSessions, ({ one, many }) => ({
+export const canvasItemsRelations = relations(canvasItems, ({ one, many }) => ({
   project: one(projects, {
-    fields: [projectSessions.projectId],
+    fields: [canvasItems.projectId],
     references: [projects.id],
   }),
-  messages: many(sessionMessages),
+  messages: many(itemMessages),
 }));
 
-export const sessionMessagesRelations = relations(sessionMessages, ({ one }) => ({
-  session: one(projectSessions, {
-    fields: [sessionMessages.sessionId],
-    references: [projectSessions.id],
+export const canvasEdgesRelations = relations(canvasEdges, ({ one }) => ({
+  project: one(projects, {
+    fields: [canvasEdges.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const itemMessagesRelations = relations(itemMessages, ({ one }) => ({
+  item: one(canvasItems, {
+    fields: [itemMessages.itemId],
+    references: [canvasItems.id],
   }),
 }));

@@ -11,133 +11,73 @@ export type SkillCategory = Exclude<(typeof SKILL_CATEGORIES)[number], "all">;
 export type SkillCategoryFilter = (typeof SKILL_CATEGORIES)[number];
 
 // ---------------------------------------------------------------------------
-// Skill-specific state shapes
+// JSON Schema (manifest)
 // ---------------------------------------------------------------------------
 
-export type DocumentSection = {
-  id: string;
-  title: string;
-  content: string;
-  order: number;
-};
-
-export type DocumentState = {
-  title?: string;
-  brief?: string;
-  sections?: DocumentSection[];
-  exportUrl?: string;
-};
-
-/** Skill state shapes keyed by skill id */
-export type SkillStateMap = {
-  document: DocumentState;
-};
-
-export type SkillId = keyof SkillStateMap;
-
-export type AnySkillState = SkillStateMap[SkillId];
-
-// ---------------------------------------------------------------------------
-// Project state (single source of truth in DB)
-// ---------------------------------------------------------------------------
-
-export type Artifact = {
-  id: string;
-  type: "file" | "export" | "preview";
-  name: string;
-  url?: string;
-  mimeType?: string;
-  createdAt: string;
-};
-
-export type ProjectMetadata = {
-  lastUserMessage?: string;
-  lastStage?: string;
+export type JSONSchemaObject = {
+  type?: string;
+  properties?: Record<string, JSONSchemaProperty>;
+  items?: JSONSchemaObject;
   [key: string]: unknown;
 };
 
-/**
- * Unified project state persisted per project.
- * `state` holds skill-specific data; version increments on each patch apply.
- */
-export type ProjectState<TState extends AnySkillState = AnySkillState> = {
-  /** Skill id this project is bound to */
-  skill: SkillId;
-  /** Skill-specific structured state */
-  state: TState;
-  /** Monotonic version for optimistic concurrency / audit */
-  version: number;
-  /** Generated outputs (exports, files, previews) */
-  artifacts: Artifact[];
-  /** Cross-cutting metadata (not used for stage derivation) */
-  metadata: ProjectMetadata;
+export type JSONSchemaProperty = {
+  type?: string;
+  title?: string;
+  description?: string;
+  items?: JSONSchemaObject;
+  [key: string]: unknown;
 };
 
+export type SkillId = string;
+
+export type BaseSkillState = Record<string, unknown>;
+
 // ---------------------------------------------------------------------------
-// Stage derivation (pure functions, no AI)
+// Stage derivation (declarative only)
 // ---------------------------------------------------------------------------
 
-export type StageRule<TState extends AnySkillState> = {
+export type DeclarativeStageConditionOp =
+  | "missing"
+  | "present"
+  | "array_empty"
+  | "array_nonempty";
+
+export type DeclarativeStageCondition = {
+  op: DeclarativeStageConditionOp;
+  paths: string[];
+  and?: DeclarativeStageCondition[];
+};
+
+export type DeclarativeStageRule = {
   id: string;
   label: string;
   description: string;
   priority: number;
-  condition: (state: TState) => boolean;
+  condition: DeclarativeStageCondition;
 };
 
-export type DerivedStage<TState extends AnySkillState> = StageRule<TState>;
-
-// ---------------------------------------------------------------------------
-// Patch system
-// ---------------------------------------------------------------------------
-
-export type PatchSetOperation = {
-  op: "set";
-  path: string;
-  value: unknown;
-};
-
-export type PatchMergeOperation = {
-  op: "merge";
-  path: string;
-  value: Record<string, unknown>;
-};
-
-export type PatchArrayOp =
-  | { op: "push"; value: unknown }
-  | { op: "update"; id: string; value: Record<string, unknown> }
-  | { op: "remove"; id: string }
-  | { op: "replace"; id: string; value: unknown };
-
-export type PatchArrayOperation = {
-  op: "array";
-  path: string;
-  operations: PatchArrayOp[];
-};
-
-export type StatePatchOperation =
-  | PatchSetOperation
-  | PatchMergeOperation
-  | PatchArrayOperation;
-
-/** Partial update to project state; applied via applyPatch (future) */
-export type StatePatch = {
-  operations: StatePatchOperation[];
+export type SkillStage = {
+  id: string;
+  label: string;
+  description: string;
+  priority: number;
 };
 
 // ---------------------------------------------------------------------------
-// AI output (structured response; not implemented in chat yet)
+// AI output
 // ---------------------------------------------------------------------------
 
-export type AIOutput = {
-  action: string;
-  patch: StatePatch;
+export type SimpleSkillOutput = {
   message: string;
-  nextAction?: string;
+  state: Record<string, unknown>;
 };
 
+/** @deprecated Use SimpleSkillOutput */
+export type AIOutput = SimpleSkillOutput;
+
 // ---------------------------------------------------------------------------
-// Skill definition
+// Skill manifests
 // ---------------------------------------------------------------------------
 
 export type SkillAction = {
@@ -146,19 +86,61 @@ export type SkillAction = {
   description?: string;
 };
 
-export type SkillDefinition<TState extends AnySkillState = AnySkillState> = {
-  id: SkillId;
+export type SkillCanvasConfig = {
+  nodeType: string;
+  defaultSize?: { w: number; h: number };
+  isComposer?: boolean;
+};
+
+export type SkillManifest = {
+  source: "builtin";
+  id: string;
+  version: string;
   name: string;
   description: string;
   category: SkillCategory;
-  icon: LucideIcon;
-  systemPrompt: string;
-  /** JSON-schema-like description for docs / future validation */
-  stateSchema: Record<string, unknown>;
-  initialState: TState;
+  icon?: LucideIcon;
+  stateSchema: JSONSchemaObject;
+  initialState: Record<string, unknown>;
+  stages: DeclarativeStageRule[];
   actions: SkillAction[];
-  stages: StageRule<TState>[];
-  deriveStage: (state: TState) => DerivedStage<TState>;
+  prompts: { system: string };
+  canvas: SkillCanvasConfig;
 };
 
-export type AnySkillDefinition = SkillDefinition<DocumentState>;
+// ---------------------------------------------------------------------------
+// Canvas item (runtime / DB row shape)
+// ---------------------------------------------------------------------------
+
+export type CanvasItemRow = {
+  id: string;
+  projectId: string;
+  skillId: string;
+  state: Record<string, unknown>;
+  positionX: number;
+  positionY: number;
+  width: number;
+  height: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CanvasItemData = Pick<
+  CanvasItemRow,
+  | "id"
+  | "projectId"
+  | "skillId"
+  | "state"
+  | "positionX"
+  | "positionY"
+  | "width"
+  | "height"
+>;
+
+export type CanvasEdgeRow = {
+  id: string;
+  projectId: string;
+  sourceItemId: string;
+  targetItemId: string;
+  createdAt: string;
+};

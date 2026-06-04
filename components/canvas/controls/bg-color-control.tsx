@@ -1,5 +1,7 @@
 "use client";
 
+import "./bg-color-control.css";
+
 import { Palette, X } from "lucide-react";
 import { useState } from "react";
 import { HexColorPicker } from "react-colorful";
@@ -82,7 +84,7 @@ export function BgColorControl({
             <X />
           </Button>
         </div>
-        <div className="space-y-3 px-3.5 pb-3">
+        <div className="lumio-bg-color-control space-y-3 px-3.5 pb-3">
           <HexColorPicker
             color={bgColor}
             onChange={onBgColorChange}

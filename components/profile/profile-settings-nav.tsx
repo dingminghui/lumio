@@ -10,7 +10,7 @@ export function ProfileSettingsNav() {
     <aside className="lg:sticky lg:top-10 lg:self-start">
       <nav
         aria-label="我的设置"
-        className="flex gap-1 overflow-x-auto rounded-lg bg-card p-1 lg:flex-col"
+        className="lumio-scrollbar flex gap-1 overflow-x-auto rounded-lg bg-card p-1 lg:flex-col"
       >
         {navigationItems.map((item) => (
           <a

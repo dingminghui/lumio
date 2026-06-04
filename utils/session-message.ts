@@ -57,6 +57,26 @@ function parseStoredAIOutput(content: string) {
   return null;
 }
 
+function getAssistantDisplayText(content: string) {
+  const parsed = parseStoredAIOutput(content);
+
+  if (parsed?.message) {
+    return parsed.message;
+  }
+
+  try {
+    const value = JSON.parse(content) as { message?: unknown };
+
+    if (typeof value.message === "string" && value.message.trim()) {
+      return value.message;
+    }
+  } catch {
+    return content;
+  }
+
+  return content;
+}
+
 export function toUiMessage(message: StoredTextMessage): LumioUIMessage {
   const output =
     message.role === "assistant" ? parseStoredAIOutput(message.content) : null;
@@ -71,6 +91,14 @@ export function toUiMessage(message: StoredTextMessage): LumioUIMessage {
           ? [{ type: "data-skill-output" as const, data: output.output }]
           : []),
       ],
+    };
+  }
+
+  if (message.role === "assistant") {
+    return {
+      id: message.id,
+      role: message.role,
+      parts: [{ type: "text", text: getAssistantDisplayText(message.content) }],
     };
   }
 
@@ -114,7 +142,8 @@ export function toStoredTextMessages(messages: LumioUIMessage[]): StoredTextMess
       content:
         message.role === "assistant" && getSkillOutput(message)
           ? JSON.stringify(getSkillOutput(message))
-          : getUiMessageText(message),
+          : getUiMessageText(message).trim(),
       createdAt: now,
-    }));
+    }))
+    .filter((message) => message.content.length > 0);
 }

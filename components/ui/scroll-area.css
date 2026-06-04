@@ -1,0 +1,15 @@
+[data-slot="scroll-area-scrollbar"] {
+  width: var(--lumio-scrollbar-size) !important;
+}
+
+[data-slot="scroll-area-scrollbar"][data-orientation="horizontal"] {
+  height: var(--lumio-scrollbar-size) !important;
+}
+
+[data-slot="scroll-area-thumb"] {
+  background-color: var(--lumio-scrollbar-thumb) !important;
+}
+
+[data-slot="scroll-area-thumb"]:hover {
+  background-color: var(--lumio-scrollbar-thumb-hover) !important;
+}

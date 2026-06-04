@@ -6,17 +6,12 @@ import {
   streamText,
 } from "ai";
 
-import {
-  applyProjectStatePatch,
-  createSessionMessage,
-  getProjectStateForSkill,
-} from "@/db/queries";
+import { createItemMessage, getCanvasItem, updateCanvasItemState } from "@/db/queries";
 import { getDecryptedModelConfig } from "@/db/profile-queries";
 import { createConfiguredProvider, type ModelProviderId } from "@/lib/model-providers";
-import { aiOutputSchema } from "@/lib/skills/ai-output-schema";
+import { bootstrapSkillRegistry, getSkillRegistry } from "@/lib/skills/bootstrap";
+import { simpleSkillOutputSchema } from "@/lib/skills/ai-output-schema";
 import { createSkillSystemPrompt } from "@/lib/skills/system-prompt";
-import { SKILL_REGISTRY, getSkillById } from "@/lib/skills";
-import type { SkillId } from "@/types/skill";
 import { getUiMessageText, type LumioUIMessage } from "@/utils/session-message";
 
 export const maxDuration = 60;
@@ -24,7 +19,7 @@ export const maxDuration = 60;
 type RouteContext = {
   params: Promise<{
     projectId: string;
-    sessionId: string;
+    itemId: string;
   }>;
 };
 
@@ -32,10 +27,8 @@ export async function POST(request: Request, { params }: RouteContext) {
   const body = (await request.json()) as {
     messages?: LumioUIMessage[];
     provider?: string;
-    skillId?: string;
   };
   const provider = body.provider as ModelProviderId;
-  const skill = getSkillById(body.skillId as SkillId) ?? SKILL_REGISTRY[0];
   let modelConfig;
 
   try {
@@ -54,13 +47,18 @@ export async function POST(request: Request, { params }: RouteContext) {
     );
   }
 
-  if (!skill) {
-    return Response.json({ error: "Skill is required" }, { status: 400 });
+  const { projectId, itemId } = await params;
+  bootstrapSkillRegistry();
+  const registry = getSkillRegistry();
+
+  const item = await getCanvasItem(itemId);
+
+  if (!item || item.projectId !== projectId) {
+    return Response.json({ error: "Canvas item not found" }, { status: 404 });
   }
 
-  const { projectId, sessionId } = await params;
+  const manifest = registry.get(item.skillId) ?? registry.getBuiltinFallback();
   const messages = body.messages ?? [];
-  const projectState = await getProjectStateForSkill(projectId, skill);
   const latestUserMessage = [...messages]
     .reverse()
     .find((message) => message.role === "user");
@@ -72,9 +70,8 @@ export async function POST(request: Request, { params }: RouteContext) {
     return Response.json({ error: "Message content is required" }, { status: 400 });
   }
 
-  await createSessionMessage({
-    sessionId,
-    projectId,
+  await createItemMessage({
+    itemId,
     role: "user",
     content: userContent,
   });
@@ -89,16 +86,20 @@ export async function POST(request: Request, { params }: RouteContext) {
     async execute({ writer }) {
       const result = streamText({
         model: configuredProvider.chatModel(modelConfig.model),
-        system: createSkillSystemPrompt({ skill, projectState }),
+        system: createSkillSystemPrompt({
+          manifest,
+          itemState: item.state,
+        }),
         messages: await convertToModelMessages(messages),
         output: Output.object({
-          schema: aiOutputSchema,
+          schema: simpleSkillOutputSchema,
         }),
       });
 
       const messagePartId = "skill-message";
       let streamedMessage = "";
-      let hasStartedMessage = false;
+
+      writer.write({ type: "text-start", id: messagePartId });
 
       function writeMessageDelta(nextMessage: string) {
         if (!nextMessage || nextMessage === streamedMessage) {
@@ -109,14 +110,6 @@ export async function POST(request: Request, { params }: RouteContext) {
           return;
         }
 
-        if (!hasStartedMessage) {
-          writer.write({
-            type: "text-start",
-            id: messagePartId,
-          });
-          hasStartedMessage = true;
-        }
-
         writer.write({
           type: "text-delta",
           id: messagePartId,
@@ -125,25 +118,39 @@ export async function POST(request: Request, { params }: RouteContext) {
         streamedMessage = nextMessage;
       }
 
-      for await (const partialOutput of result.partialOutputStream) {
-        writeMessageDelta(partialOutput.message ?? "");
-      }
+      let output;
 
-      const output = await result.output;
-      writeMessageDelta(output.message);
+      try {
+        for await (const partialOutput of result.partialOutputStream) {
+          writeMessageDelta(partialOutput.message ?? "");
+        }
 
-      if (hasStartedMessage) {
-        writer.write({
-          type: "text-end",
-          id: messagePartId,
+        output = await result.output;
+        writeMessageDelta(output.message);
+      } catch (error) {
+        const fallbackMessage = streamedMessage.trim()
+          ? streamedMessage
+          : "结构化结果生成失败，请重试。";
+
+        writeMessageDelta(fallbackMessage);
+        writer.write({ type: "text-end", id: messagePartId });
+
+        await createItemMessage({
+          itemId,
+          role: "assistant",
+          content: fallbackMessage,
         });
+
+        console.error("Failed to generate structured skill output", error);
+        return;
       }
 
-      await applyProjectStatePatch({
-        projectId,
-        skill,
-        patch: output.patch,
-        lastUserMessage: userContent,
+      writer.write({ type: "text-end", id: messagePartId });
+
+      await createItemMessage({
+        itemId,
+        role: "assistant",
+        content: JSON.stringify(output),
       });
 
       writer.write({
@@ -152,15 +159,17 @@ export async function POST(request: Request, { params }: RouteContext) {
         data: output,
       });
 
-      await createSessionMessage({
-        sessionId,
-        projectId,
-        role: "assistant",
-        content: JSON.stringify(output),
-      });
+      try {
+        await updateCanvasItemState(itemId, output.state);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "无法更新节点状态";
+        writeMessageDelta(`${streamedMessage}\n\n状态更新失败：${errorMessage}`);
+        console.error("Failed to update canvas item state", error);
+      }
     },
     originalMessages: messages,
-    onError: () => "结构化结果处理失败，未更新项目状态。",
+    onError: () => "消息处理失败，请重试。",
   });
 
   return createUIMessageStreamResponse({ stream });

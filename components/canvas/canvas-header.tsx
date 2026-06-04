@@ -1,11 +1,15 @@
 import { Panel } from "@xyflow/react";
 import Image from "next/image";
 
+import { Badge } from "@/components/ui/badge";
+import type { SkillStage } from "@/types/skill";
+
 type CanvasHeaderProps = {
   boardName: string;
+  currentStage?: SkillStage | null;
 };
 
-export function CanvasHeader({ boardName }: CanvasHeaderProps) {
+export function CanvasHeader({ boardName, currentStage }: CanvasHeaderProps) {
   return (
     <Panel
       position="top-left"
@@ -24,6 +28,11 @@ export function CanvasHeader({ boardName }: CanvasHeaderProps) {
       <span className="max-w-[12rem] truncate text-sm font-medium text-foreground">
         {boardName}
       </span>
+      {currentStage ? (
+        <Badge variant="outline" className="shrink-0">
+          {currentStage.label}
+        </Badge>
+      ) : null}
     </Panel>
   );
 }

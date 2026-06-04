@@ -1,114 +1,247 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
+import type { Viewport } from "@xyflow/react";
 
+import {
+  createCanvasItemAction,
+  deleteCanvasItemAction,
+  updateCanvasItemStateAction,
+} from "@/app/projects/actions";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
-import { SessionPanel } from "@/components/canvas/session-panel";
+import { ItemPanel } from "@/components/canvas/session-panel";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import type { ProjectSessionItem } from "@/db/queries";
+import { useCanvasItemPanel } from "@/hooks/use-canvas-item-panel";
+import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
+import { CONTENT_SAVE_DEBOUNCE_MS } from "@/lib/canvas/constants";
+import type { CanvasItemWithMessages } from "@/db/queries";
+import { deriveSkillStage } from "@/lib/skills/core/stage-engine";
+import type { SerializableSkillManifest } from "@/lib/skills/serializable-manifest";
 import { cn } from "@/lib/utils";
 import type { ModelProviderId } from "@/lib/model-providers";
-import type { AIOutput, SkillId } from "@/types/skill";
-import type { FlowSnapshot } from "@/utils/flow-snapshot";
+import type { CanvasEdgeRow, SimpleSkillOutput } from "@/types/skill";
 
-const SESSION_PANEL_ANIMATION_MS = 260;
 const CANVAS_ONLY_LAYOUT = { canvas: 100 };
-const WITH_SESSIONS_LAYOUT = { canvas: 60, sessions: 40 };
+const WITH_ITEMS_LAYOUT = { canvas: 60, items: 40 };
 
 type CanvasHomeProps = {
   projectId: string;
   boardName: string;
-  initialSnapshot: FlowSnapshot;
-  sessions: ProjectSessionItem[];
+  initialItems: CanvasItemWithMessages[];
+  initialEdges: CanvasEdgeRow[];
+  skillManifests: SerializableSkillManifest[];
+  skillOptions: { id: string; name: string }[];
   modelOptions: {
     provider: ModelProviderId;
     label: string;
     model: string;
   }[];
-  skillOptions: {
-    id: SkillId;
-    name: string;
-  }[];
+  initialViewport: Viewport;
+  bgColor: string;
+  showDots: boolean;
 };
+
+function updateItemById<T extends { id: string }>(
+  items: T[],
+  itemId: string,
+  patch: Partial<T>,
+) {
+  return items.map((item) => (item.id === itemId ? { ...item, ...patch } : item));
+}
 
 export function CanvasHome({
   projectId,
   boardName,
-  initialSnapshot,
-  sessions,
-  modelOptions,
+  initialItems,
+  initialEdges,
+  skillManifests,
   skillOptions,
+  modelOptions,
+  initialViewport,
+  bgColor,
+  showDots,
 }: CanvasHomeProps) {
-  const [isSessionPanelOpen, setIsSessionPanelOpen] = useState(true);
-  const [isSessionPanelRendered, setIsSessionPanelRendered] = useState(true);
-  const [isSessionPanelVisible, setIsSessionPanelVisible] = useState(true);
-  const [projectSessions, setProjectSessions] = useState(sessions);
-  const [activeSessionId, setActiveSessionId] = useState(sessions[0]?.id ?? "");
-  const latestSkillOutputRef = useRef<AIOutput | null>(null);
-  const closeTimerRef = useRef<number | null>(null);
-  const openRafRef = useRef<number | null>(null);
+  const [items, setItems] = useState(initialItems);
+  const [edges, setEdges] = useState(initialEdges);
+  const [activeItemId, setActiveItemId] = useState<string | null>(
+    initialItems[0]?.id ?? null,
+  );
 
-  const handleSkillOutput = useCallback((output: AIOutput) => {
-    latestSkillOutputRef.current = output;
+  const itemPanel = useCanvasItemPanel(Boolean(initialItems[0]));
+  const scheduleContentSave = useDebouncedCallback(CONTENT_SAVE_DEBOUNCE_MS);
+
+  const manifestById = useMemo(
+    () => new Map(skillManifests.map((manifest) => [manifest.id, manifest])),
+    [skillManifests],
+  );
+
+  const skillNames = useMemo(
+    () =>
+      Object.fromEntries(
+        skillManifests.map((manifest) => [manifest.id, manifest.name]),
+      ),
+    [skillManifests],
+  );
+
+  const activeItem = items.find((item) => item.id === activeItemId) ?? null;
+  const activeManifest = activeItem ? manifestById.get(activeItem.skillId) : undefined;
+
+  const currentStage = useMemo(() => {
+    if (!activeItem || !activeManifest) {
+      return null;
+    }
+
+    return deriveSkillStage(
+      {
+        source: activeManifest.source,
+        id: activeManifest.id,
+        version: "1.0.0",
+        name: activeManifest.name,
+        description: "",
+        category: "document",
+        stateSchema: activeManifest.stateSchema,
+        initialState: {},
+        stages: activeManifest.stages,
+        actions: [],
+        prompts: { system: "" },
+        canvas: activeManifest.canvas,
+      },
+      activeItem.state,
+    );
+  }, [activeItem, activeManifest]);
+
+  const handleItemSelect = useCallback(
+    (itemId: string) => {
+      setActiveItemId(itemId);
+      itemPanel.open();
+    },
+    [itemPanel],
+  );
+
+  const handleItemUpdate = useCallback((itemId: string, output: SimpleSkillOutput) => {
+    setItems((current) => updateItemById(current, itemId, { state: output.state }));
   }, []);
 
-  const clearTimers = () => {
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-    if (openRafRef.current !== null) {
-      window.cancelAnimationFrame(openRafRef.current);
-      openRafRef.current = null;
-    }
-  };
-
-  const openSessionPanel = () => {
-    clearTimers();
-    setIsSessionPanelOpen(true);
-    setIsSessionPanelRendered(true);
-    openRafRef.current = window.requestAnimationFrame(() => {
-      setIsSessionPanelVisible(true);
-      openRafRef.current = null;
-    });
-  };
-
-  const closeSessionPanel = () => {
-    clearTimers();
-    setIsSessionPanelOpen(false);
-    setIsSessionPanelVisible(false);
-    closeTimerRef.current = window.setTimeout(() => {
-      setIsSessionPanelRendered(false);
-      closeTimerRef.current = null;
-    }, SESSION_PANEL_ANIMATION_MS);
-  };
-
-  useEffect(
-    () => () => {
-      clearTimers();
+  const handleMessagesSync = useCallback(
+    (itemId: string, messages: CanvasItemWithMessages["messages"]) => {
+      setItems((current) => updateItemById(current, itemId, { messages }));
     },
     [],
+  );
+
+  const handleItemContentChange = useCallback(
+    (itemId: string, content: string) => {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === itemId ? { ...item, state: { ...item.state, content } } : item,
+        ),
+      );
+
+      scheduleContentSave(() => {
+        void updateCanvasItemStateAction(itemId, { content });
+      });
+    },
+    [scheduleContentSave],
+  );
+
+  const handleItemPositionChange = useCallback(
+    (
+      itemId: string,
+      positionX: number,
+      positionY: number,
+      width: number,
+      height: number,
+    ) => {
+      setItems((current) =>
+        updateItemById(current, itemId, {
+          positionX,
+          positionY,
+          width,
+          height,
+        }),
+      );
+    },
+    [],
+  );
+
+  const handleEdgeAdd = useCallback((edge: CanvasEdgeRow) => {
+    setEdges((current) => {
+      if (current.some((item) => item.id === edge.id)) {
+        return current;
+      }
+
+      return [...current, edge];
+    });
+  }, []);
+
+  const handleEdgeRemove = useCallback((edgeId: string) => {
+    setEdges((current) => current.filter((edge) => edge.id !== edgeId));
+  }, []);
+
+  const handleItemAdd = useCallback(
+    async (skillId: string) => {
+      const newItem = await createCanvasItemAction(projectId, skillId, {
+        x: 120 + items.length * 40,
+        y: 120 + items.length * 40,
+      });
+
+      const withMessages: CanvasItemWithMessages = { ...newItem, messages: [] };
+      setItems((current) => [...current, withMessages]);
+      setActiveItemId(newItem.id);
+      itemPanel.open();
+    },
+    [itemPanel, items.length, projectId],
+  );
+
+  const handleItemDelete = useCallback(
+    async (itemId: string) => {
+      try {
+        await deleteCanvasItemAction(itemId);
+      } catch {
+        return;
+      }
+
+      setEdges((current) =>
+        current.filter(
+          (edge) => edge.sourceItemId !== itemId && edge.targetItemId !== itemId,
+        ),
+      );
+
+      setItems((current) => {
+        const next = current.filter((item) => item.id !== itemId);
+
+        if (activeItemId === itemId) {
+          const nextActive = next[0]?.id ?? null;
+          setActiveItemId(nextActive);
+
+          if (!nextActive) {
+            itemPanel.close();
+          }
+        }
+
+        return next;
+      });
+    },
+    [activeItemId, itemPanel],
   );
 
   return (
     <main className="fixed inset-0 bg-background">
       <ResizablePanelGroup
-        key={isSessionPanelRendered ? "with-sessions" : "canvas-only"}
+        key={itemPanel.isRendered ? "with-items" : "canvas-only"}
         orientation="horizontal"
-        defaultLayout={
-          isSessionPanelRendered ? WITH_SESSIONS_LAYOUT : CANVAS_ONLY_LAYOUT
-        }
+        defaultLayout={itemPanel.isRendered ? WITH_ITEMS_LAYOUT : CANVAS_ONLY_LAYOUT}
       >
         <ResizablePanel
           id="canvas"
           defaultSize={
-            isSessionPanelRendered
-              ? `${WITH_SESSIONS_LAYOUT.canvas}%`
+            itemPanel.isRendered
+              ? `${WITH_ITEMS_LAYOUT.canvas}%`
               : `${CANVAS_ONLY_LAYOUT.canvas}%`
           }
           minSize="50%"
@@ -117,46 +250,57 @@ export function CanvasHome({
             <FlowCanvas
               projectId={projectId}
               boardName={boardName}
-              initialSnapshot={initialSnapshot}
-              isSessionPanelOpen={isSessionPanelOpen}
-              onToggleSessionPanel={() =>
-                isSessionPanelOpen ? closeSessionPanel() : openSessionPanel()
-              }
+              items={items}
+              edges={edges}
+              activeItemId={activeItemId}
+              skillOptions={skillOptions}
+              skillNames={skillNames}
+              initialViewport={initialViewport}
+              bgColor={bgColor}
+              showDots={showDots}
+              isItemPanelOpen={itemPanel.isOpen}
+              onItemSelect={handleItemSelect}
+              onItemAdd={handleItemAdd}
+              onItemDelete={handleItemDelete}
+              onItemPositionChange={handleItemPositionChange}
+              onItemContentChange={handleItemContentChange}
+              onEdgeAdd={handleEdgeAdd}
+              onEdgeRemove={handleEdgeRemove}
+              onToggleItemPanel={itemPanel.toggle}
             />
           </ReactFlowProvider>
         </ResizablePanel>
 
-        {isSessionPanelRendered ? (
+        {itemPanel.isRendered && activeItem && activeManifest ? (
           <>
             <ResizableHandle
               withHandle
               className={cn(
                 "transition-opacity duration-300 ease-out",
-                isSessionPanelVisible ? "opacity-100" : "opacity-0",
+                itemPanel.isVisible ? "opacity-100" : "opacity-0",
               )}
             />
             <ResizablePanel
-              id="sessions"
-              defaultSize={`${WITH_SESSIONS_LAYOUT.sessions}%`}
+              id="items"
+              defaultSize={`${WITH_ITEMS_LAYOUT.items}%`}
               minSize="24%"
               maxSize="50%"
               className={cn(
                 "transition-all duration-300 ease-out",
-                isSessionPanelVisible
+                itemPanel.isVisible
                   ? "translate-x-0 opacity-100"
                   : "pointer-events-none translate-x-3 opacity-0",
               )}
             >
-              <SessionPanel
+              <ItemPanel
                 projectId={projectId}
-                sessions={projectSessions}
+                item={activeItem}
+                skillName={activeManifest.name}
+                currentStage={currentStage}
                 modelOptions={modelOptions}
-                skillOptions={skillOptions}
-                onSessionsChange={setProjectSessions}
-                activeSessionId={activeSessionId}
-                onActiveSessionIdChange={setActiveSessionId}
-                onSkillOutput={handleSkillOutput}
-                onClose={closeSessionPanel}
+                onItemUpdate={handleItemUpdate}
+                onMessagesSync={handleMessagesSync}
+                onClose={itemPanel.close}
               />
             </ResizablePanel>
           </>

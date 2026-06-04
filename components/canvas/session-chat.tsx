@@ -2,13 +2,9 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import {
-  type Dispatch,
-  type SetStateAction,
-  useCallback,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useMemo, useState } from "react";
+
+import { syncItemMessagesAction } from "@/app/projects/actions";
 
 import {
   Conversation,
@@ -33,81 +29,78 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
-import { aiOutputSchema } from "@/lib/skills/ai-output-schema";
+import { simpleSkillOutputSchema } from "@/lib/skills/ai-output-schema";
 import {
   getUiMessageText,
   toStoredTextMessages,
   toUiMessage,
   type LumioUIMessage,
 } from "@/utils/session-message";
-import type { ProjectSessionItem } from "@/db/queries";
 import { cn } from "@/lib/utils";
 import type { ModelProviderId } from "@/lib/model-providers";
-import type { AIOutput, SkillId } from "@/types/skill";
+import type { SimpleSkillOutput } from "@/types/skill";
+import type { StoredTextMessage } from "@/utils/session-message";
 
-type SessionChatProps = {
+type ItemChatProps = {
   projectId: string;
-  session: ProjectSessionItem;
+  itemId: string;
+  skillName: string;
+  initialMessages: StoredTextMessage[];
   modelOptions: {
     provider: ModelProviderId;
     label: string;
     model: string;
   }[];
-  skillOptions: {
-    id: SkillId;
-    name: string;
-  }[];
-  onSessionsChange: Dispatch<SetStateAction<ProjectSessionItem[]>>;
-  onSkillOutput?: (output: AIOutput) => void;
+  onItemUpdate: (output: SimpleSkillOutput) => void;
+  onMessagesSync: (messages: StoredTextMessage[]) => void;
 };
 
-export function SessionChat({
+export function ItemChat({
   projectId,
-  session,
+  itemId,
+  skillName,
+  initialMessages,
   modelOptions,
-  skillOptions,
-  onSessionsChange,
-  onSkillOutput,
-}: SessionChatProps) {
+  onItemUpdate,
+  onMessagesSync,
+}: ItemChatProps) {
   const [selectedProvider, setSelectedProvider] = useState(
     modelOptions[0]?.provider ?? "",
-  );
-  const [selectedSkillId, setSelectedSkillId] = useState(skillOptions[0]?.id ?? "");
-  const initialMessages = useMemo(
-    () => session.messages.map(toUiMessage),
-    [session.messages],
   );
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        api: `/api/projects/${projectId}/sessions/${session.id}/chat`,
+        api: `/api/projects/${projectId}/items/${itemId}/chat`,
       }),
-    [projectId, session.id],
+    [projectId, itemId],
   );
   const { messages, sendMessage, status, stop, error, clearError } =
     useChat<LumioUIMessage>({
-      id: session.id,
-      messages: initialMessages,
+      id: itemId,
+      messages: initialMessages.map(toUiMessage),
       transport,
       dataPartSchemas: {
-        "skill-output": aiOutputSchema,
+        "skill-output": simpleSkillOutputSchema,
       },
       onData: (dataPart) => {
         if (dataPart.type === "data-skill-output") {
-          onSkillOutput?.(dataPart.data);
+          onItemUpdate(dataPart.data);
         }
       },
-      onFinish: ({ messages: finishedMessages }) => {
-        onSessionsChange((currentSessions) =>
-          currentSessions.map((currentSession) =>
-            currentSession.id === session.id
-              ? {
-                  ...currentSession,
-                  messages: toStoredTextMessages(finishedMessages),
-                }
-              : currentSession,
-          ),
-        );
+      onFinish: async ({ messages: finishedMessages, isError, isAbort }) => {
+        if (isError || isAbort) {
+          return;
+        }
+
+        try {
+          const persisted = await syncItemMessagesAction(
+            itemId,
+            toStoredTextMessages(finishedMessages),
+          );
+          onMessagesSync(persisted);
+        } catch {
+          onMessagesSync(toStoredTextMessages(finishedMessages));
+        }
       },
     });
 
@@ -119,12 +112,11 @@ export function SessionChat({
         {
           body: {
             provider: selectedProvider,
-            skillId: selectedSkillId,
           },
         },
       );
     },
-    [clearError, selectedProvider, selectedSkillId, sendMessage],
+    [clearError, selectedProvider, sendMessage],
   );
 
   return (
@@ -152,7 +144,7 @@ export function SessionChat({
           ) : (
             <ConversationEmptyState
               title="暂无消息"
-              description="输入内容开始创作问答"
+              description="输入内容，AI 将更新左侧节点"
             />
           )}
         </ConversationContent>
@@ -190,27 +182,7 @@ export function SessionChat({
                 </PromptInputSelectContent>
               </PromptInputSelect>
             </div>
-            <div className="flex min-w-0 items-center">
-              <PromptInputSelect
-                value={selectedSkillId}
-                onValueChange={(value) => setSelectedSkillId(value as SkillId)}
-              >
-                <PromptInputSelectTrigger
-                  aria-label="选择 Skill"
-                  size="sm"
-                  className="max-w-40 border-transparent bg-muted shadow-none hover:bg-muted/80"
-                >
-                  <PromptInputSelectValue placeholder="选择 Skill" />
-                </PromptInputSelectTrigger>
-                <PromptInputSelectContent>
-                  {skillOptions.map((option) => (
-                    <PromptInputSelectItem key={option.id} value={option.id}>
-                      {option.name}
-                    </PromptInputSelectItem>
-                  ))}
-                </PromptInputSelectContent>
-              </PromptInputSelect>
-            </div>
+            <span className="text-xs text-muted-foreground">{skillName}</span>
             <span className="text-xs text-muted-foreground">
               {status === "streaming" ? "正在回复..." : ""}
             </span>

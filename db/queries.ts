@@ -1,145 +1,90 @@
-import { asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import type { Viewport } from "@xyflow/react";
 
 import { db } from "@/db";
-import { projectSessions, projects, sessionMessages } from "@/db/schema";
-import {
-  applyStatePatchToProjectState,
-  normalizeProjectStateForSkill,
-} from "@/lib/skills/project-state";
-import type { AnySkillDefinition, ProjectState, StatePatch } from "@/types/skill";
-import {
-  DEFAULT_BOARD_NAME,
-  DEFAULT_FLOW_SNAPSHOT,
-  type FlowSnapshot,
-  normalizeFlowSnapshot,
-} from "@/utils/flow-snapshot";
+import { canvasEdges, canvasItems, itemMessages, projects } from "@/db/schema";
+import type { CanvasEdgeRow, CanvasItemRow } from "@/types/skill";
+import { DEFAULT_BOARD_NAME } from "@/utils/flow-snapshot";
 import type { StoredMessageRole, StoredTextMessage } from "@/utils/session-message";
 
 export type ProjectListItem = {
   id: string;
   name: string;
   updatedAt: Date;
-  sessionCount: number;
 };
 
-export type SessionMessageItem = StoredTextMessage;
-
-export type ProjectSessionItem = {
+export type ProjectDetailProject = {
   id: string;
-  title: string;
-  messages: SessionMessageItem[];
+  name: string;
+  viewport: Viewport;
+  bgColor: string;
+  showDots: boolean;
 };
 
-export async function getProjectStateForSkill(
-  projectId: string,
-  skill: AnySkillDefinition,
-): Promise<ProjectState> {
-  const [project] = await db
-    .select({
-      projectState: projects.projectState,
-    })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
+export type CanvasItemWithMessages = CanvasItemRow & {
+  messages: StoredTextMessage[];
+};
 
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  return normalizeProjectStateForSkill(project.projectState, skill);
-}
-
-export async function applyProjectStatePatch({
-  projectId,
-  skill,
-  patch,
-  lastUserMessage,
-}: {
+function mapCanvasEdge(row: {
+  id: string;
   projectId: string;
-  skill: AnySkillDefinition;
-  patch: StatePatch;
-  lastUserMessage: string;
-}) {
-  return db.transaction(async (tx) => {
-    const [project] = await tx
-      .select({
-        projectState: projects.projectState,
-      })
-      .from(projects)
-      .where(eq(projects.id, projectId))
-      .limit(1);
-
-    if (!project) {
-      throw new Error("Project not found");
-    }
-
-    const currentProjectState = normalizeProjectStateForSkill(
-      project.projectState,
-      skill,
-    );
-    const patchedProjectState = applyStatePatchToProjectState(
-      currentProjectState,
-      patch,
-      {
-        lastUserMessage,
-        lastStage: skill.deriveStage(currentProjectState.state).id,
-      },
-    );
-
-    const nextProjectState = {
-      ...patchedProjectState,
-      metadata: {
-        ...patchedProjectState.metadata,
-        lastStage: skill.deriveStage(patchedProjectState.state).id,
-      },
-    };
-
-    await tx
-      .update(projects)
-      .set({
-        skillId: skill.id,
-        projectState: nextProjectState,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(projects.id, projectId));
-
-    return nextProjectState;
-  });
+  sourceItemId: string;
+  targetItemId: string;
+  createdAt: Date;
+}): CanvasEdgeRow {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    sourceItemId: row.sourceItemId,
+    targetItemId: row.targetItemId,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
-export async function createProjectWithDefaultSession() {
-  return db.transaction(async (tx) => {
-    const [project] = await tx
-      .insert(projects)
-      .values({
-        name: DEFAULT_BOARD_NAME,
-        flowSnapshot: DEFAULT_FLOW_SNAPSHOT,
-      })
-      .returning({ id: projects.id });
+function mapCanvasItem(row: {
+  id: string;
+  projectId: string;
+  skillId: string;
+  state: Record<string, unknown> | null;
+  positionX: number;
+  positionY: number;
+  width: number;
+  height: number;
+  createdAt: Date;
+  updatedAt: Date;
+}): CanvasItemRow {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    skillId: row.skillId,
+    state: row.state ?? {},
+    positionX: row.positionX,
+    positionY: row.positionY,
+    width: row.width,
+    height: row.height,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
 
-    await tx.insert(projectSessions).values({
-      projectId: project.id,
-      title: "默认会话",
-    });
+export async function createProject({ name }: { name?: string } = {}) {
+  const [project] = await db
+    .insert(projects)
+    .values({ name: name ?? DEFAULT_BOARD_NAME })
+    .returning({ id: projects.id });
 
-    return project;
-  });
+  return project;
 }
 
 export async function listProjects(): Promise<ProjectListItem[]> {
-  const rows = await db
+  return db
     .select({
       id: projects.id,
       name: projects.name,
       updatedAt: projects.updatedAt,
-      sessionCount: sql<number>`count(${projectSessions.id})::int`,
     })
     .from(projects)
-    .leftJoin(projectSessions, eq(projectSessions.projectId, projects.id))
-    .groupBy(projects.id)
     .orderBy(desc(projects.updatedAt));
-
-  return rows;
 }
 
 export async function getProjectDetail(projectId: string) {
@@ -147,9 +92,9 @@ export async function getProjectDetail(projectId: string) {
     .select({
       id: projects.id,
       name: projects.name,
-      skillId: projects.skillId,
-      projectState: projects.projectState,
-      flowSnapshot: projects.flowSnapshot,
+      viewport: projects.viewport,
+      bgColor: projects.bgColor,
+      showDots: projects.showDots,
     })
     .from(projects)
     .where(eq(projects.id, projectId))
@@ -159,177 +104,377 @@ export async function getProjectDetail(projectId: string) {
     return null;
   }
 
-  const sessions = await db
-    .select({
-      id: projectSessions.id,
-      title: projectSessions.title,
-    })
-    .from(projectSessions)
-    .where(eq(projectSessions.projectId, project.id))
-    .orderBy(asc(projectSessions.createdAt));
+  const itemRows = await db
+    .select()
+    .from(canvasItems)
+    .where(eq(canvasItems.projectId, projectId))
+    .orderBy(asc(canvasItems.createdAt));
 
-  const messages = sessions.length
+  const itemIds = itemRows.map((row) => row.id);
+  const messageRows = itemIds.length
     ? await db
         .select({
-          id: sessionMessages.id,
-          sessionId: sessionMessages.sessionId,
-          role: sessionMessages.role,
-          content: sessionMessages.content,
-          createdAt: sessionMessages.createdAt,
+          id: itemMessages.id,
+          itemId: itemMessages.itemId,
+          role: itemMessages.role,
+          content: itemMessages.content,
+          createdAt: itemMessages.createdAt,
         })
-        .from(sessionMessages)
-        .where(
-          inArray(
-            sessionMessages.sessionId,
-            sessions.map((session) => session.id),
-          ),
-        )
-        .orderBy(asc(sessionMessages.createdAt))
+        .from(itemMessages)
+        .where(inArray(itemMessages.itemId, itemIds))
+        .orderBy(asc(itemMessages.createdAt))
     : [];
 
-  const messagesBySession = new Map<string, SessionMessageItem[]>();
+  const messagesByItem = new Map<string, StoredTextMessage[]>();
 
-  for (const message of messages) {
-    const sessionMessages = messagesBySession.get(message.sessionId) ?? [];
-    sessionMessages.push({
+  for (const message of messageRows) {
+    const list = messagesByItem.get(message.itemId) ?? [];
+    list.push({
       id: message.id,
       role: message.role,
       content: message.content,
       createdAt: message.createdAt.toISOString(),
     });
-    messagesBySession.set(message.sessionId, sessionMessages);
+    messagesByItem.set(message.itemId, list);
   }
+
+  const edgeRows = await db
+    .select()
+    .from(canvasEdges)
+    .where(eq(canvasEdges.projectId, projectId));
 
   return {
     project: {
       id: project.id,
       name: project.name,
-      skillId: project.skillId,
-      projectState: project.projectState,
-      flowSnapshot: normalizeFlowSnapshot(project.flowSnapshot),
+      viewport: project.viewport ?? { x: 0, y: 0, zoom: 1 },
+      bgColor: project.bgColor,
+      showDots: project.showDots,
     },
-    sessions: sessions.map((session) => ({
-      ...session,
-      messages: messagesBySession.get(session.id) ?? [],
+    items: itemRows.map((row) => ({
+      ...mapCanvasItem(row),
+      messages: messagesByItem.get(row.id) ?? [],
     })),
+    edges: edgeRows.map(mapCanvasEdge),
   };
 }
 
-export async function createProjectSession(projectId: string) {
-  return db.transaction(async (tx) => {
-    const [project] = await tx
-      .select({ id: projects.id })
-      .from(projects)
-      .where(eq(projects.id, projectId))
-      .limit(1);
+export async function createCanvasEdge({
+  projectId,
+  sourceItemId,
+  targetItemId,
+}: {
+  projectId: string;
+  sourceItemId: string;
+  targetItemId: string;
+}) {
+  if (sourceItemId === targetItemId) {
+    throw new Error("Cannot connect a node to itself");
+  }
 
-    if (!project) {
-      throw new Error("Project not found");
-    }
+  const [source] = await db
+    .select({ id: canvasItems.id })
+    .from(canvasItems)
+    .where(and(eq(canvasItems.id, sourceItemId), eq(canvasItems.projectId, projectId)))
+    .limit(1);
 
-    const [{ count }] = await tx
-      .select({
-        count: sql<number>`count(${projectSessions.id})::int`,
-      })
-      .from(projectSessions)
-      .where(eq(projectSessions.projectId, projectId));
+  const [target] = await db
+    .select({ id: canvasItems.id })
+    .from(canvasItems)
+    .where(and(eq(canvasItems.id, targetItemId), eq(canvasItems.projectId, projectId)))
+    .limit(1);
 
-    const [session] = await tx
-      .insert(projectSessions)
-      .values({
-        projectId,
-        title: `会话 ${count + 1}`,
-      })
-      .returning({
-        id: projectSessions.id,
-        title: projectSessions.title,
-      });
+  if (!source || !target) {
+    throw new Error("Invalid connection endpoints");
+  }
 
-    await tx
-      .update(projects)
-      .set({ updatedAt: sql`now()` })
-      .where(eq(projects.id, projectId));
+  const [existing] = await db
+    .select({ id: canvasEdges.id })
+    .from(canvasEdges)
+    .where(
+      and(
+        eq(canvasEdges.projectId, projectId),
+        eq(canvasEdges.sourceItemId, sourceItemId),
+        eq(canvasEdges.targetItemId, targetItemId),
+      ),
+    )
+    .limit(1);
 
-    return {
-      ...session,
-      messages: [],
-    };
-  });
+  if (existing) {
+    throw new Error("Connection already exists");
+  }
+
+  const [edge] = await db
+    .insert(canvasEdges)
+    .values({ projectId, sourceItemId, targetItemId })
+    .returning();
+
+  await db
+    .update(projects)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(projects.id, projectId));
+
+  return mapCanvasEdge(edge);
 }
 
-export async function updateProjectFlow(projectId: string, flowSnapshot: FlowSnapshot) {
+export async function deleteCanvasEdge(edgeId: string) {
+  await db.delete(canvasEdges).where(eq(canvasEdges.id, edgeId));
+}
+
+export async function updateProjectViewport(
+  projectId: string,
+  data: { viewport?: Viewport; bgColor?: string; showDots?: boolean; name?: string },
+) {
   await db
     .update(projects)
     .set({
-      flowSnapshot,
+      ...(data.viewport !== undefined ? { viewport: data.viewport } : {}),
+      ...(data.bgColor !== undefined ? { bgColor: data.bgColor } : {}),
+      ...(data.showDots !== undefined ? { showDots: data.showDots } : {}),
+      ...(data.name !== undefined ? { name: data.name } : {}),
       updatedAt: sql`now()`,
     })
     .where(eq(projects.id, projectId));
 }
 
-type CreateSessionMessageInput = {
-  sessionId: string;
-  role: StoredMessageRole;
-  content: string;
-  projectId?: string;
-};
+export async function createCanvasItem({
+  projectId,
+  skillId,
+  positionX = 0,
+  positionY = 0,
+  width = 400,
+  height = 120,
+  state = {},
+}: {
+  projectId: string;
+  skillId: string;
+  positionX?: number;
+  positionY?: number;
+  width?: number;
+  height?: number;
+  state?: Record<string, unknown>;
+}) {
+  const [item] = await db
+    .insert(canvasItems)
+    .values({
+      projectId,
+      skillId,
+      state,
+      positionX,
+      positionY,
+      width,
+      height,
+    })
+    .returning();
 
-export async function createSessionMessage({
-  sessionId,
+  await db
+    .update(projects)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(projects.id, projectId));
+
+  return mapCanvasItem(item);
+}
+
+export async function getCanvasItem(itemId: string) {
+  const [item] = await db
+    .select()
+    .from(canvasItems)
+    .where(eq(canvasItems.id, itemId))
+    .limit(1);
+
+  return item ? mapCanvasItem(item) : null;
+}
+
+export async function updateCanvasItemState(
+  itemId: string,
+  state: Record<string, unknown>,
+) {
+  const item = await getCanvasItem(itemId);
+
+  if (!item) {
+    throw new Error("Canvas item not found");
+  }
+
+  await db
+    .update(canvasItems)
+    .set({ state, updatedAt: sql`now()` })
+    .where(eq(canvasItems.id, itemId));
+
+  await db
+    .update(projects)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(projects.id, item.projectId));
+}
+
+export async function updateCanvasItemPosition(
+  itemId: string,
+  positionX: number,
+  positionY: number,
+  width: number,
+  height: number,
+) {
+  const item = await getCanvasItem(itemId);
+
+  if (!item) {
+    throw new Error("Canvas item not found");
+  }
+
+  await db
+    .update(canvasItems)
+    .set({ positionX, positionY, width, height, updatedAt: sql`now()` })
+    .where(eq(canvasItems.id, itemId));
+}
+
+export async function deleteCanvasItem(itemId: string) {
+  const item = await getCanvasItem(itemId);
+
+  if (!item) {
+    throw new Error("Canvas item not found");
+  }
+
+  await db.delete(canvasItems).where(eq(canvasItems.id, itemId));
+
+  await db
+    .update(projects)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(projects.id, item.projectId));
+}
+
+export async function listCanvasItems(projectId: string) {
+  const items = await db
+    .select()
+    .from(canvasItems)
+    .where(eq(canvasItems.projectId, projectId))
+    .orderBy(asc(canvasItems.createdAt));
+
+  return items.map(mapCanvasItem);
+}
+
+export async function listItemMessages(itemId: string) {
+  const messages = await db
+    .select({
+      id: itemMessages.id,
+      role: itemMessages.role,
+      content: itemMessages.content,
+      createdAt: itemMessages.createdAt,
+    })
+    .from(itemMessages)
+    .where(eq(itemMessages.itemId, itemId))
+    .orderBy(asc(itemMessages.createdAt));
+
+  return messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    createdAt: m.createdAt.toISOString(),
+  }));
+}
+
+export async function createItemMessage({
+  itemId,
   role,
   content,
-  projectId,
-}: CreateSessionMessageInput) {
+}: {
+  itemId: string;
+  role: StoredMessageRole;
+  content: string;
+}) {
   const trimmedContent = content.trim();
 
   if (!trimmedContent) {
     throw new Error("Message content is required");
   }
 
+  const item = await getCanvasItem(itemId);
+
+  if (!item) {
+    throw new Error("Canvas item not found");
+  }
+
+  const [message] = await db
+    .insert(itemMessages)
+    .values({ itemId, role, content: trimmedContent })
+    .returning({
+      id: itemMessages.id,
+      role: itemMessages.role,
+      content: itemMessages.content,
+      createdAt: itemMessages.createdAt,
+    });
+
+  await db
+    .update(canvasItems)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(canvasItems.id, itemId));
+
+  await db
+    .update(projects)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(projects.id, item.projectId));
+
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt.toISOString(),
+  };
+}
+
+export async function replaceItemMessages({
+  itemId,
+  messages,
+}: {
+  itemId: string;
+  messages: StoredTextMessage[];
+}) {
+  const persistedMessages = messages
+    .map((m) => ({ ...m, content: m.content.trim() }))
+    .filter((m) => m.content.length > 0);
+
+  const item = await getCanvasItem(itemId);
+
+  if (!item) {
+    throw new Error("Canvas item not found");
+  }
+
   return db.transaction(async (tx) => {
-    const [session] = await tx
-      .select({
-        projectId: projectSessions.projectId,
-      })
-      .from(projectSessions)
-      .where(eq(projectSessions.id, sessionId))
-      .limit(1);
+    await tx.delete(itemMessages).where(eq(itemMessages.itemId, itemId));
 
-    if (!session) {
-      throw new Error("Session not found");
+    if (!persistedMessages.length) {
+      return [];
     }
 
-    if (projectId && session.projectId !== projectId) {
-      throw new Error("Session not found");
-    }
-
-    const [message] = await tx
-      .insert(sessionMessages)
-      .values({
-        sessionId,
-        role,
-        content: trimmedContent,
-      })
+    const inserted = await tx
+      .insert(itemMessages)
+      .values(
+        persistedMessages.map((m) => ({
+          itemId,
+          role: m.role,
+          content: m.content,
+          createdAt: new Date(m.createdAt),
+        })),
+      )
       .returning({
-        id: sessionMessages.id,
-        role: sessionMessages.role,
-        content: sessionMessages.content,
-        createdAt: sessionMessages.createdAt,
+        id: itemMessages.id,
+        role: itemMessages.role,
+        content: itemMessages.content,
+        createdAt: itemMessages.createdAt,
       });
 
     await tx
-      .update(projectSessions)
+      .update(canvasItems)
       .set({ updatedAt: sql`now()` })
-      .where(eq(projectSessions.id, sessionId));
+      .where(eq(canvasItems.id, itemId));
 
     await tx
       .update(projects)
       .set({ updatedAt: sql`now()` })
-      .where(eq(projects.id, session.projectId));
+      .where(eq(projects.id, item.projectId));
 
-    return {
-      ...message,
-      createdAt: message.createdAt.toISOString(),
-    };
+    return inserted.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      createdAt: m.createdAt.toISOString(),
+    }));
   });
 }

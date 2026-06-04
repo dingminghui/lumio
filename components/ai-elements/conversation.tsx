@@ -6,6 +6,7 @@ import { useCallback } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
 import { Button } from "@/components/ui/button";
+import { LUMIO_SCROLLBAR_CLASS } from "@/lib/ui/scroll";
 import { cn } from "@/lib/utils";
 
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
@@ -13,7 +14,11 @@ export type ConversationProps = ComponentProps<typeof StickToBottom>;
 export function Conversation({ className, ...props }: ConversationProps) {
   return (
     <StickToBottom
-      className={cn("relative min-h-0 flex-1 overflow-y-hidden", className)}
+      className={cn(
+        LUMIO_SCROLLBAR_CLASS,
+        "relative min-h-0 flex-1 overflow-y-auto",
+        className,
+      )}
       initial="smooth"
       resize="smooth"
       role="log"

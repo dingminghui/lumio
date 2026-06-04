@@ -1,109 +1,77 @@
 "use client";
 
 import { PanelRightCloseIcon } from "lucide-react";
-import { type Dispatch, type SetStateAction, useState, useTransition } from "react";
 
-import { createProjectSessionAction } from "@/app/projects/actions";
-import { SessionChat } from "@/components/canvas/session-chat";
-import { SessionListPopover } from "@/components/canvas/session-list-popover";
+import { ItemChat } from "@/components/canvas/session-chat";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { ProjectSessionItem } from "@/db/queries";
+import type { CanvasItemWithMessages } from "@/db/queries";
 import type { ModelProviderId } from "@/lib/model-providers";
-import type { AIOutput, SkillId } from "@/types/skill";
+import type { SimpleSkillOutput, SkillStage } from "@/types/skill";
+import type { StoredTextMessage } from "@/utils/session-message";
 
-type SessionPanelProps = {
+type ItemPanelProps = {
   projectId: string;
-  sessions: ProjectSessionItem[];
+  item: CanvasItemWithMessages;
+  skillName: string;
+  currentStage: SkillStage | null;
   modelOptions: {
     provider: ModelProviderId;
     label: string;
     model: string;
   }[];
-  skillOptions: {
-    id: SkillId;
-    name: string;
-  }[];
-  onSessionsChange: Dispatch<SetStateAction<ProjectSessionItem[]>>;
-  activeSessionId: string;
-  onActiveSessionIdChange: (sessionId: string) => void;
-  onSkillOutput?: (output: AIOutput) => void;
+  onItemUpdate: (itemId: string, output: SimpleSkillOutput) => void;
+  onMessagesSync: (itemId: string, messages: StoredTextMessage[]) => void;
   onClose: () => void;
 };
 
-export function SessionPanel({
+export function ItemPanel({
   projectId,
-  sessions,
+  item,
+  skillName,
+  currentStage,
   modelOptions,
-  skillOptions,
-  onSessionsChange,
-  activeSessionId,
-  onActiveSessionIdChange,
-  onSkillOutput,
+  onItemUpdate,
+  onMessagesSync,
   onClose,
-}: SessionPanelProps) {
-  const [error, setError] = useState("");
-  const [isPending, startTransition] = useTransition();
-  const activeSession = sessions.find((session) => session.id === activeSessionId);
-
-  function handleCreateSession() {
-    setError("");
-    startTransition(async () => {
-      try {
-        const session = await createProjectSessionAction(projectId);
-        onSessionsChange((currentSessions) => [...currentSessions, session]);
-        onActiveSessionIdChange(session.id);
-      } catch {
-        setError("会话创建失败");
-      }
-    });
-  }
-
+}: ItemPanelProps) {
   return (
     <aside className="flex h-full min-h-0 flex-col bg-background">
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4">
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-medium">会话</h2>
-          <p className="truncate text-xs text-muted-foreground">项目内的创作问答记录</p>
+          <h2 className="truncate text-sm font-medium">节点对话</h2>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+            <p className="truncate text-xs text-muted-foreground">{skillName}</p>
+            {currentStage ? (
+              <Badge variant="outline" className="text-[10px]">
+                {currentStage.label}
+              </Badge>
+            ) : null}
+          </div>
         </div>
-        <div className="relative flex items-center gap-1">
-          <SessionListPopover
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            isCreatingSession={isPending}
-            onCreateSession={handleCreateSession}
-            onActiveSessionIdChange={onActiveSessionIdChange}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="关闭会话"
-            onClick={onClose}
-          >
-            <PanelRightCloseIcon />
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="关闭对话"
+          onClick={onClose}
+        >
+          <PanelRightCloseIcon />
+        </Button>
       </header>
 
       <div className="flex min-h-0 flex-1 p-4">
-        {activeSession ? (
-          <SessionChat
-            key={activeSession.id}
-            projectId={projectId}
-            session={activeSession}
-            modelOptions={modelOptions}
-            skillOptions={skillOptions}
-            onSessionsChange={onSessionsChange}
-            onSkillOutput={onSkillOutput}
-          />
-        ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            暂无会话
-          </div>
-        )}
+        <ItemChat
+          key={item.id}
+          projectId={projectId}
+          itemId={item.id}
+          skillName={skillName}
+          initialMessages={item.messages}
+          modelOptions={modelOptions}
+          onItemUpdate={(output) => onItemUpdate(item.id, output)}
+          onMessagesSync={(messages) => onMessagesSync(item.id, messages)}
+        />
       </div>
-
-      {error ? <p className="px-4 pb-3 text-xs text-destructive">{error}</p> : null}
     </aside>
   );
 }

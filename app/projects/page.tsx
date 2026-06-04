@@ -1,16 +1,16 @@
 import { AppShell } from "@/components/app-shell";
-import { Button } from "@/components/ui/button";
+import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listProjects } from "@/db/queries";
-import { PlusIcon } from "lucide-react";
+import { bootstrapSkillRegistry } from "@/lib/skills/bootstrap";
 import Link from "next/link";
 import { formatDateTime } from "@/utils/date";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsRoute() {
+  bootstrapSkillRegistry();
   const projects = await listProjects();
-
   return (
     <AppShell>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -18,15 +18,10 @@ export default async function ProjectsRoute() {
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-semibold tracking-normal">项目</h1>
             <p className="text-sm text-muted-foreground">
-              管理你的画板、流程和创作会话。
+              在画布上添加节点，用 AI 生成各类内容。
             </p>
           </div>
-          <Button size="lg" asChild>
-            <Link href="/projects/new" target="_blank" rel="noreferrer">
-              <PlusIcon data-icon="inline-start" />
-              新建项目
-            </Link>
-          </Button>
+          <CreateProjectDialog />
         </header>
 
         {projects.length ? (

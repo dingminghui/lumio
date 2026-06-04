@@ -1,0 +1,30 @@
+/* 全局滚动条工具类（变量定义在 app/globals.css :root） */
+
+.lumio-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lumio-scrollbar-thumb) transparent;
+}
+
+.lumio-scrollbar::-webkit-scrollbar {
+  width: var(--lumio-scrollbar-size);
+  height: var(--lumio-scrollbar-size);
+}
+
+.lumio-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lumio-scrollbar::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-color: var(--lumio-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+.lumio-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--lumio-scrollbar-thumb-hover);
+}
+
+.lumio-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}

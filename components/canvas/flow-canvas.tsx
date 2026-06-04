@@ -1,226 +1,140 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
   Background,
   BackgroundVariant,
   MiniMap,
   ReactFlow,
-  useEdgesState,
-  useNodesState,
-  useReactFlow,
-  type Connection,
-  type Edge,
-  type EdgeChange,
-  type Node,
-  type NodeChange,
-  Panel,
+  type Viewport,
 } from "@xyflow/react";
-import { MessageSquareIcon } from "lucide-react";
 
-import { updateProjectFlowAction } from "@/app/projects/actions";
 import { CanvasControls } from "@/components/canvas/canvas-controls";
 import { CanvasHeader } from "@/components/canvas/canvas-header";
-import {
-  DEFAULT_BG_COLOR,
-  DEFAULT_FLOW_SNAPSHOT,
-  DEFAULT_SHOW_DOTS,
-  type FlowSnapshot,
-} from "@/utils/flow-snapshot";
-import { Button } from "@/components/ui/button";
+import { FlowCanvasToolbar } from "@/components/canvas/flow-canvas-toolbar";
 import { useKey } from "@/hooks/use-key";
-import { deriveDotColor, isHexColor } from "@/utils/canvas";
+import { useFlowCanvasState } from "@/hooks/use-flow-canvas-state";
+import { getSkillNodeTypes } from "@/lib/skills/client-nodes";
+import type { CanvasItemWithMessages } from "@/db/queries";
+import type { CanvasEdgeRow } from "@/types/skill";
+import { deriveDotColor } from "@/utils/canvas";
+
+type SkillOption = {
+  id: string;
+  name: string;
+};
 
 type FlowCanvasProps = {
   projectId: string;
   boardName: string;
-  initialSnapshot: FlowSnapshot;
-  isSessionPanelOpen: boolean;
-  onToggleSessionPanel: () => void;
+  items: CanvasItemWithMessages[];
+  edges: CanvasEdgeRow[];
+  activeItemId: string | null;
+  skillOptions: SkillOption[];
+  skillNames: Record<string, string>;
+  initialViewport: Viewport;
+  bgColor: string;
+  showDots: boolean;
+  isItemPanelOpen: boolean;
+  onItemSelect: (itemId: string) => void;
+  onItemAdd: (skillId: string) => void;
+  onItemDelete: (itemId: string) => void;
+  onItemPositionChange: (
+    itemId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => void;
+  onItemContentChange: (itemId: string, content: string) => void;
+  onEdgeAdd: (edge: CanvasEdgeRow) => void;
+  onEdgeRemove: (edgeId: string) => void;
+  onToggleItemPanel: () => void;
 };
 
 export function FlowCanvas({
   projectId,
   boardName,
-  initialSnapshot,
-  isSessionPanelOpen,
-  onToggleSessionPanel,
+  items,
+  edges: initialEdges,
+  activeItemId,
+  skillOptions,
+  skillNames,
+  initialViewport,
+  bgColor: initialBgColor,
+  showDots: initialShowDots,
+  isItemPanelOpen,
+  onItemSelect,
+  onItemAdd,
+  onItemDelete,
+  onItemPositionChange,
+  onItemContentChange,
+  onEdgeAdd,
+  onEdgeRemove,
+  onToggleItemPanel,
 }: FlowCanvasProps) {
-  const initialFlowSnapshot = useMemo(
-    () => ({
-      ...DEFAULT_FLOW_SNAPSHOT,
-      ...initialSnapshot,
-    }),
-    [initialSnapshot],
-  );
-  const [nodes, setNodes] = useNodesState(initialFlowSnapshot.nodes);
-  const [edges, setEdges] = useEdgesState(initialFlowSnapshot.edges);
-  const [bgColor, setBgColor] = useState(
-    isHexColor(initialFlowSnapshot.bgColor)
-      ? initialFlowSnapshot.bgColor
-      : DEFAULT_BG_COLOR,
-  );
-  const [showDots, setShowDots] = useState(
-    initialFlowSnapshot.showDots ?? DEFAULT_SHOW_DOTS,
-  );
-  const [showMinimap, setShowMinimap] = useState(false);
-  const { fitView, getEdges, getNodes, getViewport, setViewport, zoomIn, zoomOut } =
-    useReactFlow();
+  const nodeTypes = useMemo(() => getSkillNodeTypes(), []);
 
-  const persistFlow = useCallback(
-    (overrides?: Partial<FlowSnapshot>) => {
-      requestAnimationFrame(() => {
-        void updateProjectFlowAction(projectId, {
-          nodes: overrides?.nodes ?? getNodes(),
-          edges: overrides?.edges ?? getEdges(),
-          viewport: overrides?.viewport ?? getViewport(),
-          name: boardName,
-          bgColor: overrides?.bgColor ?? bgColor,
-          showDots: overrides?.showDots ?? showDots,
-        });
-      });
-    },
-    [bgColor, boardName, getEdges, getNodes, getViewport, projectId, showDots],
-  );
-
-  const handleInit = useCallback(() => {
-    const viewport = initialFlowSnapshot.viewport;
-
-    if (viewport) {
-      requestAnimationFrame(() => setViewport(viewport));
-    }
-  }, [initialFlowSnapshot.viewport, setViewport]);
-
-  const handleNodesChange = useCallback(
-    (changes: NodeChange<Node>[]) => {
-      setNodes((currentNodes) => {
-        const nextNodes = applyNodeChanges(changes, currentNodes);
-        persistFlow({ nodes: nextNodes });
-
-        return nextNodes;
-      });
-    },
-    [persistFlow, setNodes],
-  );
-
-  const handleEdgesChange = useCallback(
-    (changes: EdgeChange<Edge>[]) => {
-      setEdges((currentEdges) => {
-        const nextEdges = applyEdgeChanges(changes, currentEdges);
-        persistFlow({ edges: nextEdges });
-
-        return nextEdges;
-      });
-    },
-    [persistFlow, setEdges],
-  );
-
-  const handleConnect = useCallback(
-    (connection: Connection) => {
-      setEdges((currentEdges) => {
-        const nextEdges = addEdge(connection, currentEdges);
-        persistFlow({ edges: nextEdges });
-
-        return nextEdges;
-      });
-    },
-    [persistFlow, setEdges],
-  );
-
-  const handleSetZoom = useCallback(
-    (zoom: number) => {
-      const viewport = getViewport();
-      setViewport({ ...viewport, zoom });
-      persistFlow({ viewport: { ...viewport, zoom } });
-    },
-    [getViewport, persistFlow, setViewport],
-  );
-
-  const handleBgColorChange = useCallback(
-    (color: string) => {
-      setBgColor(color);
-      persistFlow({ bgColor: color });
-    },
-    [persistFlow],
-  );
-
-  const handleShowDotsChange = useCallback(
-    (value: boolean) => {
-      setShowDots(value);
-      persistFlow({ showDots: value });
-    },
-    [persistFlow],
-  );
-
-  const handleZoomIn = useCallback(() => {
-    zoomIn({ duration: 180 });
-    requestAnimationFrame(() => persistFlow());
-  }, [persistFlow, zoomIn]);
-
-  const handleZoomOut = useCallback(() => {
-    zoomOut({ duration: 180 });
-    requestAnimationFrame(() => persistFlow());
-  }, [persistFlow, zoomOut]);
-
-  const handleFitView = useCallback(() => {
-    fitView({ padding: 0.3, duration: 200 });
-    requestAnimationFrame(() => persistFlow());
-  }, [fitView, persistFlow]);
+  const {
+    nodes,
+    edges,
+    bgColor,
+    showDots,
+    showMinimap,
+    setShowMinimap,
+    isCanvasEmpty,
+    handleInit,
+    handleNodesChange,
+    handleEdgesChange,
+    handleConnect,
+    handleNodeDragStop,
+    handleMoveEnd,
+    handleSetZoom,
+    handleBgColorChange,
+    handleShowDotsChange,
+    handleZoomIn,
+    handleZoomOut,
+    handleFitView,
+    selectCanvasItem,
+  } = useFlowCanvasState({
+    projectId,
+    items,
+    initialEdges,
+    skillNames,
+    activeItemId,
+    initialViewport,
+    initialBgColor,
+    initialShowDots,
+    onItemDelete,
+    onItemPositionChange,
+    onItemContentChange,
+    onItemSelect,
+    onEdgeAdd,
+    onEdgeRemove,
+  });
 
   useKey({ key: "1", shiftKey: true }, (event) => {
     event.preventDefault();
     handleFitView();
   });
-  useKey({ key: "+", metaKey: true }, (event) => {
-    event.preventDefault();
-    handleZoomIn();
-  });
-  useKey({ key: "+", ctrlKey: true }, (event) => {
-    event.preventDefault();
-    handleZoomIn();
-  });
-  useKey({ key: "=", metaKey: true }, (event) => {
-    event.preventDefault();
-    handleZoomIn();
-  });
-  useKey({ key: "=", ctrlKey: true }, (event) => {
-    event.preventDefault();
-    handleZoomIn();
-  });
-  useKey({ key: "-", metaKey: true }, (event) => {
-    event.preventDefault();
-    handleZoomOut();
-  });
-  useKey({ key: "-", ctrlKey: true }, (event) => {
-    event.preventDefault();
-    handleZoomOut();
-  });
-  useKey({ key: "_", metaKey: true }, (event) => {
-    event.preventDefault();
-    handleZoomOut();
-  });
-  useKey({ key: "_", ctrlKey: true }, (event) => {
-    event.preventDefault();
-    handleZoomOut();
-  });
-
-  const isCanvasEmpty = nodes.length === 0;
 
   return (
     <ReactFlow
       style={{ background: bgColor }}
       nodes={nodes}
       edges={edges}
+      nodeTypes={nodeTypes}
       onNodesChange={handleNodesChange}
       onEdgesChange={handleEdgesChange}
       onConnect={handleConnect}
       onInit={handleInit}
-      onMoveEnd={() => persistFlow()}
-      onNodeDragStop={() => persistFlow()}
-      fitView
+      onMoveEnd={handleMoveEnd}
+      onNodeClick={(_event, node) => selectCanvasItem(node.id)}
+      onNodeDragStop={handleNodeDragStop}
+      nodesConnectable
+      elementsSelectable
+      zoomOnScroll
+      zoomOnPinch
       minZoom={0.1}
       maxZoom={2.5}
       proOptions={{ hideAttribution: true }}
@@ -233,8 +147,9 @@ export function FlowCanvas({
         />
       ) : null}
       {isCanvasEmpty ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-medium text-muted-foreground">
-          输入你的想法开始创作
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+          <p className="text-lg font-medium">画布为空</p>
+          <p className="text-sm">点击右上角「新增节点」开始创作</p>
         </div>
       ) : null}
       {showMinimap ? (
@@ -246,17 +161,13 @@ export function FlowCanvas({
         />
       ) : null}
       <CanvasHeader boardName={boardName} />
-      <Panel position="top-right" className="rounded-md p-1 backdrop-blur">
-        <Button
-          type="button"
-          variant={isSessionPanelOpen ? "default" : "secondary"}
-          aria-pressed={isSessionPanelOpen}
-          onClick={onToggleSessionPanel}
-        >
-          <MessageSquareIcon data-icon="inline-start" />
-          会话
-        </Button>
-      </Panel>
+      <FlowCanvasToolbar
+        skillOptions={skillOptions}
+        activeItemId={activeItemId}
+        isItemPanelOpen={isItemPanelOpen}
+        onItemAdd={onItemAdd}
+        onToggleItemPanel={onToggleItemPanel}
+      />
       <CanvasControls
         bgColor={bgColor}
         onBgColorChange={handleBgColorChange}

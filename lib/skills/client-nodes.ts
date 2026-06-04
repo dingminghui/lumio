@@ -1,0 +1,25 @@
+"use client";
+
+import type { ComponentType } from "react";
+import type { NodeProps } from "@xyflow/react";
+
+import { TextNode } from "@/components/canvas/nodes/text-node";
+import { skillRegistry } from "@/lib/skills/core/registry";
+import { getSkillRegistry } from "@/lib/skills/register-builtins";
+
+let nodesRegistered = false;
+
+function registerSkillNodes() {
+  if (nodesRegistered) {
+    return;
+  }
+
+  getSkillRegistry();
+  skillRegistry.registerNodeComponent("text", TextNode);
+  nodesRegistered = true;
+}
+
+export function getSkillNodeTypes(): Record<string, ComponentType<NodeProps>> {
+  registerSkillNodes();
+  return skillRegistry.getNodeTypes();
+}

@@ -1,5 +1,7 @@
 "use client";
 
+import { FileText } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -8,12 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { documentSkill } from "@/lib/skills";
-import type { AnySkillDefinition } from "@/types/skill";
+import { deriveSkillStage } from "@/lib/skills/core/stage-engine";
+import { getSkillRegistry } from "@/lib/skills/register-builtins";
+import type { SkillManifest } from "@/types/skill";
 
-function SkillCard({ skill }: { skill: AnySkillDefinition }) {
-  const Icon = skill.icon;
-  const currentStage = skill.deriveStage(skill.initialState);
+function SkillCard({ skill }: { skill: SkillManifest }) {
+  const Icon = skill.icon ?? FileText;
+  const currentStage = deriveSkillStage(skill, skill.initialState);
 
   return (
     <Card size="sm" className="h-full shadow-xs ring-0">
@@ -30,7 +33,7 @@ function SkillCard({ skill }: { skill: AnySkillDefinition }) {
               </p>
             </div>
           </div>
-          <Badge variant="secondary">文档</Badge>
+          <Badge variant="secondary">内置</Badge>
         </div>
         <CardDescription className="mt-2">{skill.description}</CardDescription>
       </CardHeader>
@@ -60,9 +63,13 @@ function SkillCard({ skill }: { skill: AnySkillDefinition }) {
 }
 
 export function SkillCatalog() {
+  const skills = getSkillRegistry().list({ source: "builtin" });
+
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <SkillCard skill={documentSkill} />
+      {skills.map((skill) => (
+        <SkillCard key={skill.id} skill={skill} />
+      ))}
     </div>
   );
 }

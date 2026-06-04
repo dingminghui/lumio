@@ -1,19 +1,19 @@
-import type { AnySkillDefinition, ProjectState } from "@/types/skill";
+import type { SkillManifest } from "@/types/skill";
 
 export function createSkillSystemPrompt({
-  skill,
-  projectState,
+  manifest,
+  itemState,
 }: {
-  skill: AnySkillDefinition;
-  projectState: ProjectState;
+  manifest: SkillManifest;
+  itemState: Record<string, unknown>;
 }) {
-  return `${skill.systemPrompt}
+  return `${manifest.prompts.system}
 
-当前 Project State：
-${JSON.stringify(projectState)}
+当前节点状态（JSON）：
+${JSON.stringify(itemState, null, 2)}
 
-Patch path 规则：
-- path 默认相对于 Project State 的 state 字段，例如 "title" 等价于 "state.title"。
-- 如需写 metadata，只允许使用 "metadata.xxx"。
-- 不要修改 skill、version、artifacts 顶层字段。`;
+输出要求：
+- 仅输出一个 JSON 对象：{ "message": string, "state": object }
+- state 为更新后的完整节点状态（全量替换，不是 patch）
+- state 结构需符合该 Skill 的字段约定`;
 }
