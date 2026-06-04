@@ -19,13 +19,29 @@ export const NOOP_NODE_HANDLERS: NodeInteractionHandlers = {
   onStartDocumentEdit: () => {},
 };
 
-export function edgesToFlow(edges: CanvasEdgeRow[]): Edge[] {
+function getEdgeClassName(edge: CanvasEdgeRow, activeItemId: string | null) {
+  return [
+    "lumio-flow-edge",
+    activeItemId &&
+    (edge.sourceItemId === activeItemId || edge.targetItemId === activeItemId)
+      ? "lumio-flow-edge--active"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function edgesToFlow(
+  edges: CanvasEdgeRow[],
+  activeItemId: string | null = null,
+): Edge[] {
   return edges.map((edge) => ({
     id: edge.id,
     source: edge.sourceItemId,
     target: edge.targetItemId,
     sourceHandle: "source",
     targetHandle: "target",
+    className: getEdgeClassName(edge, activeItemId),
   }));
 }
 

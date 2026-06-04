@@ -93,7 +93,9 @@ export function useFlowCanvasState({
   const [nodes, setNodes, onNodesChange] = useNodesState(
     itemsToNodes(items, skillNames, activeItemId, NOOP_NODE_HANDLERS, skillNodeTypes),
   );
-  const [edges, setEdges, onEdgesChange] = useEdgesState(edgesToFlow(initialEdges));
+  const [edges, setEdges, onEdgesChange] = useEdgesState(
+    edgesToFlow(initialEdges, activeItemId),
+  );
   const [bgColor, setBgColor] = useState(
     isHexColor(initialBgColor) ? initialBgColor : DEFAULT_BG_COLOR,
   );
@@ -295,8 +297,8 @@ export function useFlowCanvasState({
   }, [activeItemId, items, nodeHandlers, setNodes, skillNames, skillNodeTypes]);
 
   useEffect(() => {
-    setEdges(edgesToFlow(initialEdges));
-  }, [initialEdges, setEdges]);
+    setEdges(edgesToFlow(initialEdges, activeItemId));
+  }, [activeItemId, initialEdges, setEdges]);
 
   useEffect(() => {
     if (items.length === 0 || hasAutoFitRef.current) {
@@ -368,6 +370,7 @@ export function useFlowCanvasState({
                 id: row.id,
                 sourceHandle: "source",
                 targetHandle: "target",
+                className: edgesToFlow([row], activeItemId)[0]?.className,
               },
               current,
             ),
@@ -378,7 +381,7 @@ export function useFlowCanvasState({
         }
       })();
     },
-    [onEdgeAdd, projectId, setEdges],
+    [activeItemId, onEdgeAdd, projectId, setEdges],
   );
 
   const handleNodeDragStop = useCallback(

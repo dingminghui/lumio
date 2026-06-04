@@ -201,3 +201,38 @@
     letter-spacing: var(--tracking-normal);
   }
 }
+
+@layer components {
+  .react-flow__edge.lumio-flow-edge .react-flow__edge-path {
+    stroke: color-mix(in oklch, var(--muted-foreground) 36%, transparent);
+    stroke-width: 1.25;
+    transition:
+      stroke 160ms ease,
+      stroke-width 160ms ease,
+      filter 160ms ease;
+  }
+
+  .react-flow__edge.lumio-flow-edge:hover .react-flow__edge-path,
+  .react-flow__edge.lumio-flow-edge.selected .react-flow__edge-path,
+  .react-flow__edge.lumio-flow-edge--active .react-flow__edge-path {
+    stroke: color-mix(in oklch, var(--primary) 78%, transparent);
+    stroke-dasharray: 7 9;
+    stroke-width: 2;
+    filter: drop-shadow(0 0 4px color-mix(in oklch, var(--primary) 26%, transparent));
+    animation: lumio-edge-flow 900ms linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .react-flow__edge.lumio-flow-edge:hover .react-flow__edge-path,
+    .react-flow__edge.lumio-flow-edge.selected .react-flow__edge-path,
+    .react-flow__edge.lumio-flow-edge--active .react-flow__edge-path {
+      animation: none;
+    }
+  }
+}
+
+@keyframes lumio-edge-flow {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
