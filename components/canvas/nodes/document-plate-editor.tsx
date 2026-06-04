@@ -49,10 +49,7 @@ function DocumentPlateEditorInstance({
   onMarkdownEmitted,
 }: DocumentPlateEditorInstanceProps) {
   const editorRootRef = useRef<HTMLDivElement>(null);
-  const initialValue = useMemo(
-    () => createInitialDocumentValue(markdown),
-    [markdown],
-  );
+  const initialValue = useMemo(() => createInitialDocumentValue(markdown), [markdown]);
 
   const editor = usePlateEditor({
     plugins: documentEditorPlugins,

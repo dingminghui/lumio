@@ -208,8 +208,7 @@ export function useFlowCanvasState({
         return;
       }
 
-      const { width: containerWidth, height: containerHeight } =
-        store.getState();
+      const { width: containerWidth, height: containerHeight } = store.getState();
       const { zoom } = getViewport();
       const layout = getDocumentEditLayout(node, {
         width: containerWidth,
@@ -219,18 +218,14 @@ export function useFlowCanvasState({
 
       setNodes((current) =>
         current.map((entry) =>
-          entry.id === itemId
-            ? applyDocumentEditLayoutToNode(entry, layout)
-            : entry,
+          entry.id === itemId ? applyDocumentEditLayoutToNode(entry, layout) : entry,
         ),
       );
 
       const finishLayoutAnimation = () => {
         setNodes((current) =>
           current.map((entry) =>
-            entry.id === itemId
-              ? clearDocumentEditLayoutAnimation(entry)
-              : entry,
+            entry.id === itemId ? clearDocumentEditLayoutAnimation(entry) : entry,
           ),
         );
 

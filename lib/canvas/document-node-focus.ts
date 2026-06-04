@@ -101,13 +101,7 @@ export function getDocumentEditLayout(
   const { width, height } = computeDocumentEditSize(container);
 
   return {
-    position: layoutKeepingCenter(
-      node.position,
-      oldWidth,
-      oldHeight,
-      width,
-      height,
-    ),
+    position: layoutKeepingCenter(node.position, oldWidth, oldHeight, width, height),
     width,
     height,
   };
