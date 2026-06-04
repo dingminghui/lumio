@@ -22,3 +22,24 @@ export type ProfileModelConfig = {
   hasApiKey: boolean;
   validatedAt: string | null;
 };
+
+export type ImageModelConfigRow = {
+  id: string;
+  label: string;
+  accountId: string;
+  apiToken: string;
+  model: string;
+  hasApiToken: boolean;
+  validatedAt: string | null;
+  status: SaveStatus;
+  message: string;
+};
+
+export type ProfileImageModelConfig = {
+  id: string;
+  label: string;
+  accountId: string;
+  model: string;
+  hasApiToken: boolean;
+  validatedAt: string | null;
+};

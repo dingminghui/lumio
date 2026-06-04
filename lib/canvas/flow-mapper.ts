@@ -79,13 +79,14 @@ export function itemsToNodes(
   skillNames: Record<string, string>,
   activeItemId: string | null,
   handlers: NodeInteractionHandlers,
+  skillNodeTypes: Record<string, string> = {},
 ): Node[] {
   return items.map((item) => {
     const height = item.height ?? NODE_DEFAULT_HEIGHT;
 
     return {
       id: item.id,
-      type: "text",
+      type: skillNodeTypes[item.skillId] ?? "text",
       position: { x: item.positionX, y: item.positionY },
       width: item.width,
       height,
@@ -122,6 +123,7 @@ export function syncNodesFromItems(
   skillNames: Record<string, string>,
   activeItemId: string | null,
   handlers: NodeInteractionHandlers,
+  skillNodeTypes: Record<string, string> = {},
 ): Node[] {
   const layoutById = new Map(
     currentNodes.map((node) => [
@@ -134,9 +136,11 @@ export function syncNodesFromItems(
     ]),
   );
 
-  return itemsToNodes(items, skillNames, activeItemId, handlers).map((node) => {
-    const layout = layoutById.get(node.id);
+  return itemsToNodes(items, skillNames, activeItemId, handlers, skillNodeTypes).map(
+    (node) => {
+      const layout = layoutById.get(node.id);
 
-    return layout ? mergeNodeLayout(node, layout) : node;
-  });
+      return layout ? mergeNodeLayout(node, layout) : node;
+    },
+  );
 }

@@ -11,6 +11,7 @@ import { getDecryptedModelConfig } from "@/db/profile-queries";
 import { createConfiguredProvider, type ModelProviderId } from "@/lib/model-providers";
 import { bootstrapSkillRegistry, getSkillRegistry } from "@/lib/skills/bootstrap";
 import { simpleSkillOutputSchema } from "@/lib/skills/ai-output-schema";
+import { resolveImageSkillOutput } from "@/lib/skills/image/runtime";
 import { createSkillSystemPrompt } from "@/lib/skills/system-prompt";
 import { getUiMessageText, type LumioUIMessage } from "@/utils/session-message";
 
@@ -144,6 +145,12 @@ export async function POST(request: Request, { params }: RouteContext) {
         console.error("Failed to generate structured skill output", error);
         return;
       }
+
+      output = await resolveImageSkillOutput({
+        skillId: manifest.id,
+        output,
+        onMessage: writeMessageDelta,
+      });
 
       writer.write({ type: "text-end", id: messagePartId });
 

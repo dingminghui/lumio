@@ -1,7 +1,12 @@
 import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { modelConfigs, userProfile } from "@/db/schema";
+import { imageModelConfigs, modelConfigs, userProfile } from "@/db/schema";
+import {
+  CLOUDFLARE_IMAGE_MODEL,
+  CLOUDFLARE_IMAGE_PROVIDER_ID,
+  CLOUDFLARE_IMAGE_PROVIDER_LABEL,
+} from "@/lib/cloudflare-workers-ai";
 import { decryptModelApiKey, encryptModelApiKey } from "@/lib/model-config-crypto";
 import {
   MODEL_PROVIDER_IDS,
@@ -27,6 +32,22 @@ export type DecryptedModelConfig = {
   baseUrl: string;
   model: string;
   apiKey: string;
+  validatedAt: Date | null;
+};
+
+export type SavedImageModelConfig = {
+  id: typeof CLOUDFLARE_IMAGE_PROVIDER_ID;
+  label: typeof CLOUDFLARE_IMAGE_PROVIDER_LABEL;
+  accountId: string;
+  model: string;
+  hasApiToken: boolean;
+  validatedAt: Date | null;
+};
+
+export type DecryptedImageModelConfig = {
+  accountId: string;
+  model: string;
+  apiToken: string;
   validatedAt: Date | null;
 };
 
@@ -149,10 +170,98 @@ export async function saveValidatedModelConfig({
   };
 }
 
+export async function getSavedImageModelConfig(): Promise<SavedImageModelConfig> {
+  const [config] = await db
+    .select({
+      accountId: imageModelConfigs.accountId,
+      model: imageModelConfigs.model,
+      validatedAt: imageModelConfigs.validatedAt,
+    })
+    .from(imageModelConfigs)
+    .where(eq(imageModelConfigs.id, CLOUDFLARE_IMAGE_PROVIDER_ID))
+    .limit(1);
+
+  return {
+    id: CLOUDFLARE_IMAGE_PROVIDER_ID,
+    label: CLOUDFLARE_IMAGE_PROVIDER_LABEL,
+    accountId: config?.accountId ?? "",
+    model: config?.model ?? CLOUDFLARE_IMAGE_MODEL,
+    hasApiToken: Boolean(config),
+    validatedAt: config?.validatedAt ?? null,
+  };
+}
+
+export async function getDecryptedImageModelConfig(): Promise<DecryptedImageModelConfig | null> {
+  const [config] = await db
+    .select({
+      accountId: imageModelConfigs.accountId,
+      apiTokenEncrypted: imageModelConfigs.apiTokenEncrypted,
+      model: imageModelConfigs.model,
+      validatedAt: imageModelConfigs.validatedAt,
+    })
+    .from(imageModelConfigs)
+    .where(eq(imageModelConfigs.id, CLOUDFLARE_IMAGE_PROVIDER_ID))
+    .limit(1);
+
+  if (!config) {
+    return null;
+  }
+
+  return {
+    accountId: config.accountId,
+    model: config.model,
+    apiToken: decryptModelApiKey(config.apiTokenEncrypted),
+    validatedAt: config.validatedAt,
+  };
+}
+
+export async function saveValidatedImageModelConfig({
+  accountId,
+  apiToken,
+}: {
+  accountId: string;
+  apiToken: string;
+}) {
+  const encryptedApiToken = encryptModelApiKey(apiToken);
+
+  const [config] = await db
+    .insert(imageModelConfigs)
+    .values({
+      id: CLOUDFLARE_IMAGE_PROVIDER_ID,
+      accountId,
+      apiTokenEncrypted: encryptedApiToken,
+      model: CLOUDFLARE_IMAGE_MODEL,
+      validatedAt: sql`now()`,
+    })
+    .onConflictDoUpdate({
+      target: imageModelConfigs.id,
+      set: {
+        accountId,
+        apiTokenEncrypted: encryptedApiToken,
+        model: CLOUDFLARE_IMAGE_MODEL,
+        validatedAt: sql`now()`,
+        updatedAt: sql`now()`,
+      },
+    })
+    .returning({
+      accountId: imageModelConfigs.accountId,
+      model: imageModelConfigs.model,
+      validatedAt: imageModelConfigs.validatedAt,
+    });
+
+  return {
+    id: CLOUDFLARE_IMAGE_PROVIDER_ID,
+    label: CLOUDFLARE_IMAGE_PROVIDER_LABEL,
+    ...config,
+    hasApiToken: true,
+  };
+}
+
 export async function getProfileSettings() {
-  const [profile, savedConfigs] = await Promise.all([
+  const [profile, savedConfigs, imageModelConfig] = await Promise.all([
     getUserProfileSettings(),
     listSavedModelConfigs(),
+    getSavedImageModelConfig(),
   ]);
 
   const savedConfigByProvider = new Map(
@@ -174,5 +283,6 @@ export async function getProfileSettings() {
         validatedAt: savedConfig?.validatedAt ?? null,
       };
     }),
+    imageModelConfig,
   };
 }

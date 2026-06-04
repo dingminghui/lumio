@@ -88,6 +88,17 @@ export function CanvasHome({
     [skillManifests],
   );
 
+  const skillNodeTypes = useMemo(
+    () =>
+      Object.fromEntries(
+        skillManifests.map((manifest) => [
+          manifest.id,
+          manifest.canvas.nodeType || "text",
+        ]),
+      ),
+    [skillManifests],
+  );
+
   const activeItem = items.find((item) => item.id === activeItemId) ?? null;
   const activeManifest = activeItem ? manifestById.get(activeItem.skillId) : undefined;
 
@@ -103,7 +114,7 @@ export function CanvasHome({
         version: "1.0.0",
         name: activeManifest.name,
         description: "",
-        category: "document",
+        category: activeManifest.category,
         stateSchema: activeManifest.stateSchema,
         initialState: {},
         stages: activeManifest.stages,
@@ -255,6 +266,7 @@ export function CanvasHome({
               activeItemId={activeItemId}
               skillOptions={skillOptions}
               skillNames={skillNames}
+              skillNodeTypes={skillNodeTypes}
               initialViewport={initialViewport}
               bgColor={bgColor}
               showDots={showDots}

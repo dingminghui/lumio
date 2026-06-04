@@ -4,7 +4,12 @@ import { generateText } from "ai";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { saveValidatedModelConfig, updateUserProfileName } from "@/db/profile-queries";
+import {
+  saveValidatedImageModelConfig,
+  saveValidatedModelConfig,
+  updateUserProfileName,
+} from "@/db/profile-queries";
+import { validateCloudflareImageConfig } from "@/lib/cloudflare-workers-ai";
 import {
   MODEL_PROVIDER_IDS,
   MODEL_PROVIDERS,
@@ -16,6 +21,11 @@ const providerSchema = z.enum(MODEL_PROVIDER_IDS);
 
 const modelConfigSchema = z.object({
   apiKey: z.string().trim().min(1, "请输入 API Key"),
+});
+
+const imageModelConfigSchema = z.object({
+  accountId: z.string().trim().min(1, "请输入 Account ID"),
+  apiToken: z.string().trim().min(1, "请输入 API Token"),
 });
 
 function getErrorMessage(error: unknown) {
@@ -128,6 +138,51 @@ export async function validateAndSaveModelConfigAction(
         message === "MODEL_CONFIG_SECRET is required"
           ? "缺少 MODEL_CONFIG_SECRET，无法安全保存 API Key"
           : "校验失败，请检查 API Key 或当前 DeepSeek 配置",
+    };
+  }
+}
+
+export async function validateAndSaveImageModelConfigAction(input: {
+  accountId: string;
+  apiToken: string;
+}) {
+  const inputResult = imageModelConfigSchema.safeParse(input);
+
+  if (!inputResult.success) {
+    return {
+      ok: false as const,
+      message: inputResult.error.issues[0]?.message ?? "图片模型配置无效",
+    };
+  }
+
+  const { accountId, apiToken } = inputResult.data;
+
+  try {
+    await validateCloudflareImageConfig({ accountId, apiToken });
+
+    const config = await saveValidatedImageModelConfig({
+      accountId,
+      apiToken,
+    });
+
+    revalidatePath("/profile");
+
+    return {
+      ok: true as const,
+      config: {
+        ...config,
+        validatedAt: config.validatedAt?.toISOString() ?? null,
+      },
+    };
+  } catch (error) {
+    const message = getErrorMessage(error);
+
+    return {
+      ok: false as const,
+      message:
+        message === "MODEL_CONFIG_SECRET is required"
+          ? "缺少 MODEL_CONFIG_SECRET，无法安全保存 API Token"
+          : `测试连接失败：${message}`,
     };
   }
 }

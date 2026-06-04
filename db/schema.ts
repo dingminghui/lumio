@@ -104,6 +104,15 @@ export const modelConfigs = pgTable("model_configs", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const imageModelConfigs = pgTable("image_model_configs", {
+  id: text("id").primaryKey().default("cloudflare-workers-ai"),
+  accountId: text("account_id").notNull(),
+  apiTokenEncrypted: text("api_token_encrypted").notNull(),
+  model: text("model").notNull(),
+  validatedAt: timestamp("validated_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const projectsRelations = relations(projects, ({ many }) => ({
   items: many(canvasItems),
   edges: many(canvasEdges),

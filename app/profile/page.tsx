@@ -15,6 +15,10 @@ export default async function ProfileRoute() {
           ...config,
           validatedAt: config.validatedAt?.toISOString() ?? null,
         }))}
+        imageModelConfig={{
+          ...settings.imageModelConfig,
+          validatedAt: settings.imageModelConfig.validatedAt?.toISOString() ?? null,
+        }}
       />
     </AppShell>
   );

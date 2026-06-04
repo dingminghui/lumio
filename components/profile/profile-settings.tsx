@@ -4,13 +4,17 @@ import { useState } from "react";
 
 import {
   saveUserProfileNameAction,
+  validateAndSaveImageModelConfigAction,
   validateAndSaveModelConfigAction,
 } from "@/app/profile/actions";
+import { ImageModelConfigSection } from "@/components/profile/image-model-config-section";
 import { ModelConfigSection } from "@/components/profile/model-config-section";
 import { PersonalCenterSection } from "@/components/profile/personal-center-section";
 import { ProfileSettingsNav } from "@/components/profile/profile-settings-nav";
 import type {
+  ImageModelConfigRow,
   ModelConfigRow,
+  ProfileImageModelConfig,
   ProfileModelConfig,
   SaveStatus,
 } from "@/components/profile/profile-settings-types";
@@ -21,6 +25,7 @@ type ProfileSettingsProps = {
     name: string;
   };
   modelConfigs: ProfileModelConfig[];
+  imageModelConfig: ProfileImageModelConfig;
 };
 
 function getInitialModelRows(modelConfigs: ProfileModelConfig[]): ModelConfigRow[] {
@@ -32,15 +37,34 @@ function getInitialModelRows(modelConfigs: ProfileModelConfig[]): ModelConfigRow
   }));
 }
 
-export function ProfileSettings({ profile, modelConfigs }: ProfileSettingsProps) {
+function getInitialImageModelRow(
+  imageModelConfig: ProfileImageModelConfig,
+): ImageModelConfigRow {
+  return {
+    ...imageModelConfig,
+    apiToken: "",
+    status: imageModelConfig.validatedAt ? "saved" : "idle",
+    message: "",
+  };
+}
+
+export function ProfileSettings({
+  profile,
+  modelConfigs,
+  imageModelConfig,
+}: ProfileSettingsProps) {
   const [name, setName] = useState(profile.name);
   const [savedName, setSavedName] = useState(profile.name);
   const [nameStatus, setNameStatus] = useState<SaveStatus>("idle");
   const [nameMessage, setNameMessage] = useState("");
   const [rows, setRows] = useState(() => getInitialModelRows(modelConfigs));
+  const [imageRow, setImageRow] = useState(() =>
+    getInitialImageModelRow(imageModelConfig),
+  );
   const [visibleKeys, setVisibleKeys] = useState<Record<ModelProviderId, boolean>>({
     deepseek: false,
   });
+  const [isImageTokenVisible, setIsImageTokenVisible] = useState(false);
 
   async function handleNameBlur() {
     if (name.trim() === savedName) {
@@ -121,6 +145,37 @@ export function ProfileSettings({ profile, modelConfigs }: ProfileSettingsProps)
     }));
   }
 
+  function updateImageRow(updates: Partial<ImageModelConfigRow>) {
+    setImageRow((currentRow) => ({ ...currentRow, ...updates }));
+  }
+
+  async function handleImageModelSave() {
+    updateImageRow({ status: "saving", message: "" });
+
+    const result = await validateAndSaveImageModelConfigAction({
+      accountId: imageRow.accountId,
+      apiToken: imageRow.apiToken,
+    });
+
+    if (result.ok) {
+      updateImageRow({
+        accountId: result.config.accountId,
+        apiToken: "",
+        hasApiToken: result.config.hasApiToken,
+        model: result.config.model,
+        validatedAt: result.config.validatedAt,
+        status: "saved",
+        message: "",
+      });
+      return;
+    }
+
+    updateImageRow({
+      status: "error",
+      message: result.message,
+    });
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-[calc(100vw-8rem)] min-w-0 flex-col gap-6 sm:max-w-6xl">
       <header className="flex flex-col gap-1">
@@ -145,6 +200,18 @@ export function ProfileSettings({ profile, modelConfigs }: ProfileSettingsProps)
             onApiKeyBlur={handleModelSave}
             onApiKeyChange={handleApiKeyChange}
             onKeyVisibilityToggle={toggleKeyVisibility}
+          />
+          <ImageModelConfigSection
+            row={imageRow}
+            isTokenVisible={isImageTokenVisible}
+            onAccountIdChange={(accountId) =>
+              updateImageRow({ accountId, status: "idle", message: "" })
+            }
+            onApiTokenChange={(apiToken) =>
+              updateImageRow({ apiToken, status: "idle", message: "" })
+            }
+            onKeyVisibilityToggle={() => setIsImageTokenVisible((current) => !current)}
+            onTestConnection={handleImageModelSave}
           />
         </div>
       </div>

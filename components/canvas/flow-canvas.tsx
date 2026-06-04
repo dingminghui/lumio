@@ -32,6 +32,7 @@ type FlowCanvasProps = {
   activeItemId: string | null;
   skillOptions: SkillOption[];
   skillNames: Record<string, string>;
+  skillNodeTypes: Record<string, string>;
   initialViewport: Viewport;
   bgColor: string;
   showDots: boolean;
@@ -60,6 +61,7 @@ export function FlowCanvas({
   activeItemId,
   skillOptions,
   skillNames,
+  skillNodeTypes,
   initialViewport,
   bgColor: initialBgColor,
   showDots: initialShowDots,
@@ -101,6 +103,7 @@ export function FlowCanvas({
     items,
     initialEdges,
     skillNames,
+    skillNodeTypes,
     activeItemId,
     initialViewport,
     initialBgColor,

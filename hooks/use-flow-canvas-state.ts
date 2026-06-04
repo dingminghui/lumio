@@ -50,6 +50,7 @@ type UseFlowCanvasStateOptions = {
   items: CanvasItemWithMessages[];
   initialEdges: CanvasEdgeRow[];
   skillNames: Record<string, string>;
+  skillNodeTypes: Record<string, string>;
   activeItemId: string | null;
   initialViewport: Viewport;
   initialBgColor: string;
@@ -73,6 +74,7 @@ export function useFlowCanvasState({
   items,
   initialEdges,
   skillNames,
+  skillNodeTypes,
   activeItemId,
   initialViewport,
   initialBgColor,
@@ -89,7 +91,7 @@ export function useFlowCanvasState({
   const scheduleViewportSave = useDebouncedCallback(VIEWPORT_SAVE_DEBOUNCE_MS);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(
-    itemsToNodes(items, skillNames, activeItemId, NOOP_NODE_HANDLERS),
+    itemsToNodes(items, skillNames, activeItemId, NOOP_NODE_HANDLERS, skillNodeTypes),
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(edgesToFlow(initialEdges));
   const [bgColor, setBgColor] = useState(
@@ -281,9 +283,16 @@ export function useFlowCanvasState({
 
   useEffect(() => {
     setNodes((currentNodes) =>
-      syncNodesFromItems(currentNodes, items, skillNames, activeItemId, nodeHandlers),
+      syncNodesFromItems(
+        currentNodes,
+        items,
+        skillNames,
+        activeItemId,
+        nodeHandlers,
+        skillNodeTypes,
+      ),
     );
-  }, [activeItemId, items, nodeHandlers, setNodes, skillNames]);
+  }, [activeItemId, items, nodeHandlers, setNodes, skillNames, skillNodeTypes]);
 
   useEffect(() => {
     setEdges(edgesToFlow(initialEdges));

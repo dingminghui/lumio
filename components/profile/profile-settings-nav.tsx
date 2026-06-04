@@ -3,6 +3,7 @@
 const navigationItems = [
   { href: "#personal-center", label: "个人中心" },
   { href: "#model-configs", label: "模型配置" },
+  { href: "#image-model-configs", label: "图片模型" },
 ];
 
 export function ProfileSettingsNav() {
