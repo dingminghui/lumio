@@ -135,10 +135,10 @@ export function TextNode({ data, selected }: NodeProps) {
         ref={nodeCardRef}
         onBlurCapture={handleCardBlurCapture}
         className={cn(
-          "flex h-full w-full cursor-grab flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-shadow active:cursor-grabbing",
+          "flex h-full w-full cursor-grab flex-col overflow-hidden rounded-xl border border-transparent bg-card text-card-foreground shadow-xs transition-[border-color,box-shadow] active:cursor-grabbing",
           selected
             ? "border-primary shadow-md ring-2 ring-primary/20"
-            : "border-border",
+            : "border-transparent",
         )}
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 px-3 py-2">

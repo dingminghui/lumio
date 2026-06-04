@@ -1,29 +1,31 @@
 .lumio-text-node__resize-handle {
   z-index: 30 !important;
-  width: 7px !important;
-  height: 7px !important;
+  width: 8px !important;
+  height: 8px !important;
   border: 1.5px solid var(--primary) !important;
-  background: var(--background) !important;
-  border-radius: 9999px !important;
+  background: var(--card) !important;
+  border-radius: 2px !important;
+  box-shadow: 0 0 0 2px var(--background) !important;
 }
 
 .lumio-text-node__resize-handle::before {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -5px;
 }
 
 .lumio-text-node__connect-handle {
-  width: 5px !important;
-  height: 5px !important;
-  border: 1px solid var(--primary) !important;
-  background: var(--background) !important;
+  width: 10px !important;
+  height: 10px !important;
+  border: 2px solid var(--background) !important;
+  background: var(--primary) !important;
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--primary), transparent 45%) !important;
 }
 
 .lumio-text-node__connect-handle::before {
   content: "";
   position: absolute;
-  inset: -6px;
+  inset: -10px;
 }
 
 /* 文档编辑聚焦：节点尺寸/位移与视口 fitView 同步过渡 */
