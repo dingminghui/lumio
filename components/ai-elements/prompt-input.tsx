@@ -18,6 +18,13 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export type PromptInputMessage = {
@@ -128,6 +135,12 @@ export function PromptInputTools({ className, ...props }: PromptInputToolsProps)
     <div className={cn("flex min-w-0 items-center gap-1", className)} {...props} />
   );
 }
+
+export const PromptInputSelect = Select;
+export const PromptInputSelectContent = SelectContent;
+export const PromptInputSelectItem = SelectItem;
+export const PromptInputSelectTrigger = SelectTrigger;
+export const PromptInputSelectValue = SelectValue;
 
 export type PromptInputButtonProps = ComponentProps<typeof InputGroupButton>;
 

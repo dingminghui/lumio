@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/resizable";
 import type { ProjectSessionItem } from "@/db/queries";
 import { cn } from "@/lib/utils";
+import type { ModelProviderId } from "@/lib/model-providers";
+import type { AIOutput, SkillId } from "@/types/skill";
 import type { FlowSnapshot } from "@/utils/flow-snapshot";
 
 const SESSION_PANEL_ANIMATION_MS = 260;
@@ -23,6 +25,15 @@ type CanvasHomeProps = {
   boardName: string;
   initialSnapshot: FlowSnapshot;
   sessions: ProjectSessionItem[];
+  modelOptions: {
+    provider: ModelProviderId;
+    label: string;
+    model: string;
+  }[];
+  skillOptions: {
+    id: SkillId;
+    name: string;
+  }[];
 };
 
 export function CanvasHome({
@@ -30,14 +41,21 @@ export function CanvasHome({
   boardName,
   initialSnapshot,
   sessions,
+  modelOptions,
+  skillOptions,
 }: CanvasHomeProps) {
   const [isSessionPanelOpen, setIsSessionPanelOpen] = useState(true);
   const [isSessionPanelRendered, setIsSessionPanelRendered] = useState(true);
   const [isSessionPanelVisible, setIsSessionPanelVisible] = useState(true);
   const [projectSessions, setProjectSessions] = useState(sessions);
   const [activeSessionId, setActiveSessionId] = useState(sessions[0]?.id ?? "");
+  const latestSkillOutputRef = useRef<AIOutput | null>(null);
   const closeTimerRef = useRef<number | null>(null);
   const openRafRef = useRef<number | null>(null);
+
+  const handleSkillOutput = useCallback((output: AIOutput) => {
+    latestSkillOutputRef.current = output;
+  }, []);
 
   const clearTimers = () => {
     if (closeTimerRef.current !== null) {
@@ -132,9 +150,12 @@ export function CanvasHome({
               <SessionPanel
                 projectId={projectId}
                 sessions={projectSessions}
+                modelOptions={modelOptions}
+                skillOptions={skillOptions}
                 onSessionsChange={setProjectSessions}
                 activeSessionId={activeSessionId}
                 onActiveSessionIdChange={setActiveSessionId}
+                onSkillOutput={handleSkillOutput}
                 onClose={closeSessionPanel}
               />
             </ResizablePanel>

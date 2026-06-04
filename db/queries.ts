@@ -3,6 +3,11 @@ import { asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { projectSessions, projects, sessionMessages } from "@/db/schema";
 import {
+  applyStatePatchToProjectState,
+  normalizeProjectStateForSkill,
+} from "@/lib/skills/project-state";
+import type { AnySkillDefinition, ProjectState, StatePatch } from "@/types/skill";
+import {
   DEFAULT_BOARD_NAME,
   DEFAULT_FLOW_SNAPSHOT,
   type FlowSnapshot,
@@ -24,6 +29,83 @@ export type ProjectSessionItem = {
   title: string;
   messages: SessionMessageItem[];
 };
+
+export async function getProjectStateForSkill(
+  projectId: string,
+  skill: AnySkillDefinition,
+): Promise<ProjectState> {
+  const [project] = await db
+    .select({
+      projectState: projects.projectState,
+    })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  return normalizeProjectStateForSkill(project.projectState, skill);
+}
+
+export async function applyProjectStatePatch({
+  projectId,
+  skill,
+  patch,
+  lastUserMessage,
+}: {
+  projectId: string;
+  skill: AnySkillDefinition;
+  patch: StatePatch;
+  lastUserMessage: string;
+}) {
+  return db.transaction(async (tx) => {
+    const [project] = await tx
+      .select({
+        projectState: projects.projectState,
+      })
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1);
+
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const currentProjectState = normalizeProjectStateForSkill(
+      project.projectState,
+      skill,
+    );
+    const patchedProjectState = applyStatePatchToProjectState(
+      currentProjectState,
+      patch,
+      {
+        lastUserMessage,
+        lastStage: skill.deriveStage(currentProjectState.state).id,
+      },
+    );
+
+    const nextProjectState = {
+      ...patchedProjectState,
+      metadata: {
+        ...patchedProjectState.metadata,
+        lastStage: skill.deriveStage(patchedProjectState.state).id,
+      },
+    };
+
+    await tx
+      .update(projects)
+      .set({
+        skillId: skill.id,
+        projectState: nextProjectState,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(projects.id, projectId));
+
+    return nextProjectState;
+  });
+}
 
 export async function createProjectWithDefaultSession() {
   return db.transaction(async (tx) => {

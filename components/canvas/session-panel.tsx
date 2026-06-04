@@ -8,22 +8,37 @@ import { SessionChat } from "@/components/canvas/session-chat";
 import { SessionListPopover } from "@/components/canvas/session-list-popover";
 import { Button } from "@/components/ui/button";
 import type { ProjectSessionItem } from "@/db/queries";
+import type { ModelProviderId } from "@/lib/model-providers";
+import type { AIOutput, SkillId } from "@/types/skill";
 
 type SessionPanelProps = {
   projectId: string;
   sessions: ProjectSessionItem[];
+  modelOptions: {
+    provider: ModelProviderId;
+    label: string;
+    model: string;
+  }[];
+  skillOptions: {
+    id: SkillId;
+    name: string;
+  }[];
   onSessionsChange: Dispatch<SetStateAction<ProjectSessionItem[]>>;
   activeSessionId: string;
   onActiveSessionIdChange: (sessionId: string) => void;
+  onSkillOutput?: (output: AIOutput) => void;
   onClose: () => void;
 };
 
 export function SessionPanel({
   projectId,
   sessions,
+  modelOptions,
+  skillOptions,
   onSessionsChange,
   activeSessionId,
   onActiveSessionIdChange,
+  onSkillOutput,
   onClose,
 }: SessionPanelProps) {
   const [error, setError] = useState("");
@@ -76,7 +91,10 @@ export function SessionPanel({
             key={activeSession.id}
             projectId={projectId}
             session={activeSession}
+            modelOptions={modelOptions}
+            skillOptions={skillOptions}
             onSessionsChange={onSessionsChange}
+            onSkillOutput={onSkillOutput}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
