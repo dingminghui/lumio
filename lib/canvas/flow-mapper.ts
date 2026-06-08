@@ -10,6 +10,7 @@ export type NodeInteractionHandlers = {
   onResizeEnd: (itemId: string, width: number, height: number) => void;
   onContentChange: (itemId: string, content: string) => void;
   onStartDocumentEdit: (itemId: string) => void;
+  onGenerate?: (itemId: string) => void;
 };
 
 export const NOOP_NODE_HANDLERS: NodeInteractionHandlers = {
@@ -96,6 +97,7 @@ export function itemsToNodes(
   activeItemId: string | null,
   handlers: NodeInteractionHandlers,
   skillNodeTypes: Record<string, string> = {},
+  upstreamDocumentCounts: Record<string, number> = {},
 ): Node[] {
   return items.map((item) => {
     const height = item.height ?? NODE_DEFAULT_HEIGHT;
@@ -112,6 +114,7 @@ export function itemsToNodes(
         skillId: item.skillId,
         skillName: skillNames[item.skillId] ?? item.skillId,
         state: item.state,
+        upstreamDocumentCount: upstreamDocumentCounts[item.id] ?? 0,
         onResize: (width: number, nodeHeight: number) => {
           handlers.onResize(item.id, width, nodeHeight);
         },
@@ -128,6 +131,11 @@ export function itemsToNodes(
               handlers.onStartDocumentEdit(item.id);
             }
           : undefined,
+        onGenerate: handlers.onGenerate
+          ? () => {
+              handlers.onGenerate?.(item.id);
+            }
+          : undefined,
       },
     };
   });
@@ -140,6 +148,7 @@ export function syncNodesFromItems(
   activeItemId: string | null,
   handlers: NodeInteractionHandlers,
   skillNodeTypes: Record<string, string> = {},
+  upstreamDocumentCounts: Record<string, number> = {},
 ): Node[] {
   const layoutById = new Map(
     currentNodes.map((node) => [
@@ -152,11 +161,16 @@ export function syncNodesFromItems(
     ]),
   );
 
-  return itemsToNodes(items, skillNames, activeItemId, handlers, skillNodeTypes).map(
-    (node) => {
-      const layout = layoutById.get(node.id);
+  return itemsToNodes(
+    items,
+    skillNames,
+    activeItemId,
+    handlers,
+    skillNodeTypes,
+    upstreamDocumentCounts,
+  ).map((node) => {
+    const layout = layoutById.get(node.id);
 
-      return layout ? mergeNodeLayout(node, layout) : node;
-    },
-  );
+    return layout ? mergeNodeLayout(node, layout) : node;
+  });
 }

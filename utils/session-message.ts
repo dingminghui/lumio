@@ -123,6 +123,27 @@ export function getUiMessageText(message: UIMessage | LumioUIMessage) {
   return message.parts.map((part) => (isTextPart(part) ? part.text : "")).join("");
 }
 
+/** 发给模型时只保留文本，避免 data-skill-output 等自定义 part 干扰结构化输出 */
+export function toTextOnlyUiMessages(messages: LumioUIMessage[]): LumioUIMessage[] {
+  const textOnlyMessages: LumioUIMessage[] = [];
+
+  for (const message of messages) {
+    const text = getUiMessageText(message).trim();
+
+    if (!text || message.role === "system") {
+      continue;
+    }
+
+    textOnlyMessages.push({
+      id: message.id,
+      role: message.role,
+      parts: [{ type: "text", text }],
+    });
+  }
+
+  return textOnlyMessages;
+}
+
 function getSkillOutput(message: LumioUIMessage) {
   const outputPart = message.parts.find((part) => part.type === "data-skill-output");
 

@@ -53,6 +53,7 @@ type ItemChatProps = {
   }[];
   onItemUpdate: (output: SimpleSkillOutput) => void;
   onMessagesSync: (messages: StoredTextMessage[]) => void;
+  onGenerationRevert?: () => void;
 };
 
 export function ItemChat({
@@ -63,6 +64,7 @@ export function ItemChat({
   modelOptions,
   onItemUpdate,
   onMessagesSync,
+  onGenerationRevert,
 }: ItemChatProps) {
   const [selectedProvider, setSelectedProvider] = useState(
     modelOptions[0]?.provider ?? "",
@@ -89,6 +91,7 @@ export function ItemChat({
       },
       onFinish: async ({ messages: finishedMessages, isError, isAbort }) => {
         if (isError || isAbort) {
+          onGenerationRevert?.();
           return;
         }
 
