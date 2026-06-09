@@ -15,9 +15,10 @@ Match project tooling; do not invent alternate style.
 
 ## Prettier defaults
 
-- Double quotes, semicolons, trailing commas (`all`)
-- `printWidth`: 88
+- Double quotes (JS/JSX), semicolons, trailing commas (`all`), LF, `printWidth` 88
 - Tailwind class order via `prettier-plugin-tailwindcss` (`tailwindStylesheet`: `app/globals.css`)
+- Sort classes inside `cn` / `cva` / `clsx` via `tailwindFunctions`
+- Markdown: `proseWrap: preserve`
 
 ## Stack conventions
 

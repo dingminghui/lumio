@@ -77,7 +77,7 @@ function parseStoredNodeChatResult(content: string) {
   }
 }
 
-function formatNodeChatResultText(result: NodeChatResult) {
+function formatNodeChatResultDisplayText(result: NodeChatResult) {
   const progress = result.toolCalls.flatMap((toolCall) => toolCall.progress);
 
   return [...progress, result.message].filter(Boolean).join("\n\n");
@@ -87,7 +87,7 @@ function getAssistantDisplayText(content: string) {
   const nodeChatResult = parseStoredNodeChatResult(content);
 
   if (nodeChatResult) {
-    return formatNodeChatResultText(nodeChatResult);
+    return formatNodeChatResultDisplayText(nodeChatResult);
   }
 
   const parsed = parseStoredAIOutput(content);
@@ -109,6 +109,84 @@ function getAssistantDisplayText(content: string) {
   return content;
 }
 
+function isTextPart(part: unknown): part is { type: "text"; text: string } {
+  if (!part || typeof part !== "object") {
+    return false;
+  }
+
+  const record = part as Record<string, unknown>;
+
+  return record.type === "text" && typeof record.text === "string";
+}
+
+function getTextFromParts(message: UIMessage | LumioUIMessage) {
+  return message.parts.map((part) => (isTextPart(part) ? part.text : "")).join("");
+}
+
+function getSkillOutput(message: LumioUIMessage) {
+  const outputPart = message.parts.find((part) => part.type === "data-skill-output");
+
+  return outputPart?.data ?? null;
+}
+
+function getNodeChatResult(message: LumioUIMessage) {
+  const resultPart = message.parts.find(
+    (part) => part.type === "data-node-chat-result",
+  );
+
+  return resultPart?.data ?? null;
+}
+
+/** UI 展示文本（含 tool 进度、状态提示等） */
+export function getMessageDisplayText(message: UIMessage | LumioUIMessage) {
+  if (message.role === "assistant") {
+    const nodeChatResult = getNodeChatResult(message as LumioUIMessage);
+
+    if (nodeChatResult) {
+      return formatNodeChatResultDisplayText(nodeChatResult);
+    }
+  }
+
+  return getTextFromParts(message);
+}
+
+/** 发给模型或落库的纯正文（不含 tool 进度） */
+export function getMessageModelText(message: LumioUIMessage) {
+  if (message.role === "assistant") {
+    const nodeChatResult = getNodeChatResult(message);
+
+    if (nodeChatResult?.message.trim()) {
+      return nodeChatResult.message.trim();
+    }
+
+    const skillOutput = getSkillOutput(message);
+
+    if (skillOutput?.message.trim()) {
+      return skillOutput.message.trim();
+    }
+  }
+
+  return getTextFromParts(message).trim();
+}
+
+function getStoredMessageContent(message: LumioUIMessage) {
+  if (message.role === "assistant") {
+    const nodeChatResult = getNodeChatResult(message);
+
+    if (nodeChatResult) {
+      return JSON.stringify(nodeChatResult);
+    }
+
+    const skillOutput = getSkillOutput(message);
+
+    if (skillOutput) {
+      return JSON.stringify(skillOutput);
+    }
+  }
+
+  return getMessageModelText(message);
+}
+
 export function toUiMessage(message: StoredTextMessage): LumioUIMessage {
   const nodeChatResult =
     message.role === "assistant" ? parseStoredNodeChatResult(message.content) : null;
@@ -119,7 +197,7 @@ export function toUiMessage(message: StoredTextMessage): LumioUIMessage {
       role: message.role,
       metadata: { createdAt: message.createdAt },
       parts: [
-        { type: "text", text: formatNodeChatResultText(nodeChatResult) },
+        { type: "text", text: formatNodeChatResultDisplayText(nodeChatResult) },
         { type: "data-node-chat-result", data: nodeChatResult },
         ...(nodeChatResult.output
           ? [{ type: "data-skill-output" as const, data: nodeChatResult.output }]
@@ -162,29 +240,12 @@ export function toUiMessage(message: StoredTextMessage): LumioUIMessage {
   };
 }
 
-function isTextPart(part: unknown): part is { type: "text"; text: string } {
-  if (!part || typeof part !== "object") {
-    return false;
-  }
-
-  const record = part as Record<string, unknown>;
-
-  return record.type === "text" && typeof record.text === "string";
-}
-
-export function getUiMessageText(message: UIMessage | LumioUIMessage) {
-  return message.parts.map((part) => (isTextPart(part) ? part.text : "")).join("");
-}
-
 /** 发给模型时只保留文本，避免 data-skill-output 等自定义 part 干扰结构化输出 */
 export function toTextOnlyUiMessages(messages: LumioUIMessage[]): LumioUIMessage[] {
   const textOnlyMessages: LumioUIMessage[] = [];
 
   for (const message of messages) {
-    const text =
-      message.role === "assistant"
-        ? getNodeChatResult(message)?.message?.trim() || getUiMessageText(message).trim()
-        : getUiMessageText(message).trim();
+    const text = getMessageModelText(message);
 
     if (!text || message.role === "system") {
       continue;
@@ -201,20 +262,6 @@ export function toTextOnlyUiMessages(messages: LumioUIMessage[]): LumioUIMessage
   return textOnlyMessages;
 }
 
-function getSkillOutput(message: LumioUIMessage) {
-  const outputPart = message.parts.find((part) => part.type === "data-skill-output");
-
-  return outputPart?.data ?? null;
-}
-
-function getNodeChatResult(message: LumioUIMessage) {
-  const resultPart = message.parts.find(
-    (part) => part.type === "data-node-chat-result",
-  );
-
-  return resultPart?.data ?? null;
-}
-
 export function getSkillOutputFromNodeChatResult(
   result: NodeChatResult,
 ): AIOutput | null {
@@ -226,9 +273,7 @@ export function getSkillOutputFromNodeChatResult(
 }
 
 /** 从 UI 消息中提取应写入画布的 skill output（优先 data-skill-output，其次 commit 的 node-chat-result） */
-export function getSkillOutputFromUiMessage(
-  message: LumioUIMessage,
-): AIOutput | null {
+export function getSkillOutputFromUiMessage(message: LumioUIMessage): AIOutput | null {
   const skillOutput = getSkillOutput(message);
 
   if (skillOutput) {
@@ -250,12 +295,7 @@ export function toStoredTextMessages(messages: LumioUIMessage[]): StoredTextMess
     .map((message) => ({
       id: message.id,
       role: message.role,
-      content:
-        message.role === "assistant" && getNodeChatResult(message)
-          ? JSON.stringify(getNodeChatResult(message))
-          : message.role === "assistant" && getSkillOutput(message)
-            ? JSON.stringify(getSkillOutput(message))
-            : getUiMessageText(message).trim(),
+      content: getStoredMessageContent(message),
       createdAt: message.metadata?.createdAt ?? now,
     }))
     .filter((message) => message.content.length > 0);

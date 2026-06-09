@@ -2,14 +2,12 @@ import { AppShell } from "@/components/app-shell";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listProjects } from "@/db/queries";
-import { bootstrapSkillRegistry } from "@/lib/skills/bootstrap";
 import Link from "next/link";
 import { formatDateTime } from "@/utils/date";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsRoute() {
-  bootstrapSkillRegistry();
   const projects = await listProjects();
   return (
     <AppShell>

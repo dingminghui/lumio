@@ -33,7 +33,9 @@ Plate 配置（`lib/plate/document-editor-plugins.ts`）：
 `lib/canvas/node-menu.ts`：
 
 - **可用**：`registry.listSkillOptions()` 内置 Skill（当前为「文档生成」）
-- **占位**：生成 PPT、生成 Word、生成配图、HTML 合成 → 点击 toast「暂时还没有开发好呢」
+- **占位**：生成 PPT、生成 Word → 点击 toast「暂时还没有开发好呢」
+
+节点对话的 system prompt 由 `lib/skills/system-prompt.ts` 提供：`createSkillSystemPrompt`（生成/改 state）与 `createAnswerSystemPrompt`（纯问答）。
 
 ## 连线
 

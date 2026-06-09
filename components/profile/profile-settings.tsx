@@ -59,15 +59,12 @@ export function ProfileSettings({ profile }: ProfileSettingsProps) {
         orientation="vertical"
         className="flex w-full min-w-0 flex-col gap-4 lg:flex-row lg:gap-6"
       >
-        <TabsList
-          variant="line"
-          className="lumio-scrollbar h-fit w-full shrink-0 flex-row overflow-x-auto bg-card p-1 lg:w-48 lg:flex-col lg:items-stretch lg:overflow-visible"
-        >
+        <TabsList variant="line">
           {profileTabs.map((tab) => (
             <TabsTrigger
               key={tab.value}
               value={tab.value}
-              className="shrink-0 justify-center px-3 py-2 lg:w-full lg:justify-start"
+              className="shrink-0 justify-center px-3 py-1 lg:w-full lg:justify-start"
             >
               {tab.label}
             </TabsTrigger>

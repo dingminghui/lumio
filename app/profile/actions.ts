@@ -2,17 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 
-import { updateUserProfileName } from "@/db/profile-queries";
+import { updateUserProfileName, type UserProfileSettings } from "@/db/profile-queries";
+import { getErrorMessage } from "@/utils/error-message";
 
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
+export type SaveUserProfileNameResult =
+  | { ok: true; profile: UserProfileSettings }
+  | { ok: false; message: string };
 
-  return "操作失败";
-}
-
-export async function saveUserProfileNameAction(name: string) {
+export async function saveUserProfileNameAction(
+  name: string,
+): Promise<SaveUserProfileNameResult> {
   try {
     const profile = await updateUserProfileName(name);
     revalidatePath("/profile");

@@ -23,7 +23,9 @@ export async function getUserProfileSettings(): Promise<UserProfileSettings> {
   return profile ?? { id: DEFAULT_PROFILE_ID, name: "" };
 }
 
-export async function updateUserProfileName(name: string) {
+export async function updateUserProfileName(
+  name: string,
+): Promise<UserProfileSettings> {
   const trimmedName = name.trim();
 
   const [profile] = await db
@@ -43,6 +45,10 @@ export async function updateUserProfileName(name: string) {
       id: userProfile.id,
       name: userProfile.name,
     });
+
+  if (!profile) {
+    throw new Error("Failed to update profile");
+  }
 
   return profile;
 }

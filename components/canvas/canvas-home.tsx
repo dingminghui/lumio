@@ -100,20 +100,7 @@ export function CanvasHome({
     }
 
     return deriveSkillStage(
-      {
-        source: activeManifest.source,
-        id: activeManifest.id,
-        version: "1.0.0",
-        name: activeManifest.name,
-        description: "",
-        category: activeManifest.category,
-        stateSchema: activeManifest.stateSchema,
-        initialState: {},
-        stages: activeManifest.stages,
-        actions: [],
-        prompts: { system: "" },
-        canvas: activeManifest.canvas,
-      },
+      { id: activeManifest.id, stages: activeManifest.stages },
       activeItem.state,
     );
   }, [activeItem, activeManifest]);
@@ -126,14 +113,9 @@ export function CanvasHome({
     [itemPanel],
   );
 
-  const handleItemUpdate = useCallback(
-    (itemId: string, output: SimpleSkillOutput) => {
-      setItems((current) =>
-        updateItemById(current, itemId, { state: output.state }),
-      );
-    },
-    [],
-  );
+  const handleItemUpdate = useCallback((itemId: string, output: SimpleSkillOutput) => {
+    setItems((current) => updateItemById(current, itemId, { state: output.state }));
+  }, []);
 
   const handleMessagesSync = useCallback(
     (itemId: string, messages: CanvasItemWithMessages["messages"]) => {

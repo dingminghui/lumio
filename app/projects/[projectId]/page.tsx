@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { CanvasHome } from "@/components/canvas/canvas-home";
 import { getProjectDetail } from "@/db/queries";
-import { bootstrapSkillRegistry, getSkillRegistry } from "@/lib/skills/bootstrap";
+import { getSkillRegistry } from "@/lib/skills/register-builtins";
 import { toSerializableSkillManifest } from "@/lib/skills/serializable-manifest";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,6 @@ type ProjectDetailPageProps = {
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { projectId } = await params;
-  bootstrapSkillRegistry();
   const registry = getSkillRegistry();
   const detail = await getProjectDetail(projectId);
 

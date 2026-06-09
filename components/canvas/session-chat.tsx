@@ -29,7 +29,7 @@ import { nodeChatResultSchema } from "@/lib/skills/node-chat-schema";
 import {
   getSkillOutputFromNodeChatResult,
   getSkillOutputFromUiMessage,
-  getUiMessageText,
+  getMessageDisplayText,
   toStoredTextMessages,
   toUiMessage,
   type LumioUIMessage,
@@ -154,7 +154,7 @@ export function ItemChat({
         <ConversationContent>
           {messages.length ? (
             messages.map((message) => {
-              const content = getUiMessageText(message);
+              const content = getMessageDisplayText(message);
 
               return (
                 <Message key={message.id} from={message.role}>

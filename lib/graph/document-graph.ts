@@ -11,7 +11,10 @@ import {
   type NodeChatDecision,
   type NodeChatResult,
 } from "@/lib/skills/node-chat-schema";
-import { createSkillSystemPrompt } from "@/lib/skills/system-prompt";
+import {
+  createAnswerSystemPrompt,
+  createSkillSystemPrompt,
+} from "@/lib/skills/system-prompt";
 import type { SimpleSkillOutput, SkillManifest } from "@/types/skill";
 
 // ---------------------------------------------------------------------------
@@ -50,27 +53,9 @@ export type DocumentGraphState = typeof DocumentState.State;
 // ---------------------------------------------------------------------------
 
 function getOnText(config: RunnableConfig): (delta: string) => void {
-  return (config.configurable?.onText as ((delta: string) => void) | undefined) ?? (() => {});
-}
-
-function createAnswerSystemPrompt(
-  manifest: SkillManifest,
-  itemState: Record<string, unknown>,
-) {
-  return `你是 Lumio 的节点会话助手。请用中文自然回答用户的问题。
-
-当前节点：
-- skillId: ${manifest.id}
-- skillName: ${manifest.name}
-- description: ${manifest.description}
-
-当前节点状态：
-${JSON.stringify(itemState, null, 2)}
-
-规则：
-- 只回答用户问题，不输出 JSON。
-- 不要声称已经修改、保存或写入节点。
-- 如果用户想调用的能力不属于当前节点，简短说明应该切换到对应节点。`;
+  return (
+    (config.configurable?.onText as ((delta: string) => void) | undefined) ?? (() => {})
+  );
 }
 
 // ---------------------------------------------------------------------------

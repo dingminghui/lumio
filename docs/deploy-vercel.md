@@ -51,11 +51,11 @@ Neon 请优先使用带 `-pooler` 或标注 **Pooled** 的 URL（与 `db/index.t
    - Build Command: `pnpm vercel-build`
 5. **Environment Variables**（Production，建议 Production / Preview / Development 都填同一套用于预览）：
 
-   | 变量名              | 说明                         | 必填 |
-   | ------------------- | ---------------------------- | ---- |
-   | `DATABASE_URL`      | 上一步的数据库连接串         | 是   |
-   | `DEEPSEEK_API_KEY`  | DeepSeek API Key             | 是   |
-   | `DEEPSEEK_BASE_URL` | DeepSeek API 端点            | 是   |
+   | 变量名              | 说明                             | 必填 |
+   | ------------------- | -------------------------------- | ---- |
+   | `DATABASE_URL`      | 上一步的数据库连接串             | 是   |
+   | `DEEPSEEK_API_KEY`  | DeepSeek API Key                 | 是   |
+   | `DEEPSEEK_BASE_URL` | DeepSeek API 端点                | 是   |
    | `DEEPSEEK_MODEL`    | 对话模型名称（如 deepseek-chat） | 是   |
 
 6. 点击 **Deploy**，等待构建完成。

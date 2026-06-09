@@ -10,7 +10,7 @@ import {
   updateCanvasItemState,
   updateProjectViewport,
 } from "@/db/queries";
-import { bootstrapSkillRegistry, getSkillRegistry } from "@/lib/skills/bootstrap";
+import { getSkillRegistry } from "@/lib/skills/register-builtins";
 import type { StoredTextMessage } from "@/utils/session-message";
 import type { Viewport } from "@xyflow/react";
 
@@ -19,10 +19,8 @@ export async function createCanvasItemAction(
   skillId: string,
   position?: { x: number; y: number; width?: number; height?: number },
 ) {
-  bootstrapSkillRegistry();
   const registry = getSkillRegistry();
-  const manifest = registry.get(skillId) ?? registry.getBuiltinFallback();
-
+  const manifest = registry.get(skillId) ?? registry.require(skillId);
   return createCanvasItem({
     projectId,
     skillId: manifest.id,

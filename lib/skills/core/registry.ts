@@ -46,15 +46,11 @@ export class SkillRegistry {
         return false;
       }
 
-      if (
+      return !(
         filter.category &&
         filter.category !== "all" &&
         manifest.category !== filter.category
-      ) {
-        return false;
-      }
-
-      return true;
+      );
     });
   }
 

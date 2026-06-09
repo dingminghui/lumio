@@ -1,9 +1,13 @@
 import type {
   DeclarativeStageCondition,
   DeclarativeStageRule,
-  SkillManifest,
   SkillStage,
 } from "@/types/skill";
+
+export type StageInput = {
+  id: string;
+  stages: DeclarativeStageRule[];
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -68,7 +72,7 @@ function evaluateCondition(
   return primary && condition.and.every((child) => evaluateCondition(state, child));
 }
 
-export function deriveSkillStage(manifest: SkillManifest, state: unknown): SkillStage {
+export function deriveSkillStage(manifest: StageInput, state: unknown): SkillStage {
   const record = isRecord(state) ? state : {};
   const matched = manifest.stages
     .filter((rule) => evaluateCondition(record, rule.condition))
@@ -90,7 +94,7 @@ export function deriveSkillStage(manifest: SkillManifest, state: unknown): Skill
 }
 
 export function getStageById(
-  manifest: SkillManifest,
+  manifest: StageInput,
   stageId: string | undefined,
 ): SkillStage | null {
   if (!stageId) {

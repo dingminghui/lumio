@@ -36,9 +36,9 @@ async function isInitialSchemaPresent(sql) {
   const [result] = await sql`
     select
       to_regclass('public.projects') is not null
-      and to_regclass('public.project_sessions') is not null
-      and to_regclass('public.session_messages') is not null
-      and to_regtype('public.session_message_role') is not null as exists
+      and to_regclass('public.canvas_items') is not null
+      and to_regclass('public.item_messages') is not null
+      and to_regtype('public.message_role') is not null as exists
   `;
 
   return result.exists;
