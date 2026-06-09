@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation";
 import { type ReactNode } from "react";
 
-import newProjectAnimation from "@/assets/lottie/1.json";
 import homeAnimation from "@/assets/lottie/2.json";
 import projectsAnimation from "@/assets/lottie/3.json";
 import settingsAnimation from "@/assets/lottie/4.json";
@@ -13,13 +12,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const navItems: AppNavItemConfig[] = [
-  {
-    label: "新建项目",
-    href: "/projects/new",
-    aliases: [],
-    animationData: newProjectAnimation,
-    opensInNewTab: true,
-  },
   {
     label: "首页",
     href: "/home",

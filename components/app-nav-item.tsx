@@ -13,7 +13,6 @@ export type AppNavItemConfig = {
   aliases: readonly string[];
   activePrefixes?: readonly string[];
   animationData: unknown;
-  opensInNewTab?: boolean;
 };
 
 type AppNavItemProps = {
@@ -37,8 +36,6 @@ export function AppNavItem({ item, isActive }: AppNavItemProps) {
       <TooltipTrigger asChild>
         <Link
           href={item.href}
-          target={item.opensInNewTab ? "_blank" : undefined}
-          rel={item.opensInNewTab ? "noreferrer" : undefined}
           aria-label={item.label}
           onBlur={stopAnimation}
           onFocus={playAnimation}
