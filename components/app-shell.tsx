@@ -5,7 +5,6 @@ import { type ReactNode } from "react";
 
 import homeAnimation from "@/assets/lottie/2.json";
 import projectsAnimation from "@/assets/lottie/3.json";
-import settingsAnimation from "@/assets/lottie/4.json";
 import profileAnimation from "@/assets/lottie/5.json";
 import { AppNavItem, type AppNavItemConfig } from "@/components/app-nav-item";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -24,12 +23,6 @@ const navItems: AppNavItemConfig[] = [
     aliases: [],
     activePrefixes: ["/projects/"],
     animationData: projectsAnimation,
-  },
-  {
-    label: "配置",
-    href: "/settings",
-    aliases: [],
-    animationData: settingsAnimation,
   },
   {
     label: "我的",

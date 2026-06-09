@@ -5,9 +5,9 @@ import {
 } from "ai";
 
 import { createItemMessage, getCanvasItem, updateCanvasItemState } from "@/db/queries";
-import { getDecryptedModelConfig } from "@/db/profile-queries";
 import { documentGraph } from "@/lib/graph/document-graph";
-import { createConfiguredProvider, type ModelProviderId } from "@/lib/model-providers";
+import { createConfiguredProvider } from "@/lib/model-providers";
+import { getServerModelConfig } from "@/lib/server-model-config";
 import { bootstrapSkillRegistry, getSkillRegistry } from "@/lib/skills/bootstrap";
 import type { NodeChatResult, NodeToolCall } from "@/lib/skills/node-chat-schema";
 import {
@@ -43,9 +43,7 @@ function createWriteToolCall({
 export async function POST(request: Request, { params }: RouteContext) {
   const body = (await request.json()) as {
     messages?: LumioUIMessage[];
-    provider?: string;
   };
-  const provider = body.provider as ModelProviderId;
 
   const { projectId, itemId } = await params;
   bootstrapSkillRegistry();
@@ -80,23 +78,17 @@ export async function POST(request: Request, { params }: RouteContext) {
   let modelConfig;
 
   try {
-    modelConfig = await getDecryptedModelConfig(provider);
-  } catch {
+    modelConfig = getServerModelConfig();
+  } catch (error) {
     return Response.json(
-      { error: "Missing MODEL_CONFIG_SECRET or invalid saved model config" },
-      { status: 500 },
-    );
-  }
-
-  if (!modelConfig?.validatedAt) {
-    return Response.json(
-      { error: "请先在我的 / 模型配置中完成 API Key 配置" },
+      {
+        error: error instanceof Error ? error.message : "模型环境变量配置无效",
+      },
       { status: 500 },
     );
   }
 
   const configuredProvider = createConfiguredProvider({
-    provider: modelConfig.provider,
     apiKey: modelConfig.apiKey,
     baseUrl: modelConfig.baseUrl,
   });

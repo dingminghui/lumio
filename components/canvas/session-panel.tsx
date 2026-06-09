@@ -6,7 +6,6 @@ import { ItemChat } from "@/components/canvas/session-chat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CanvasItemWithMessages } from "@/db/queries";
-import type { ModelProviderId } from "@/lib/model-providers";
 import type { SimpleSkillOutput, SkillStage } from "@/types/skill";
 import type { StoredTextMessage } from "@/utils/session-message";
 
@@ -15,11 +14,6 @@ type ItemPanelProps = {
   item: CanvasItemWithMessages;
   skillName: string;
   currentStage: SkillStage | null;
-  modelOptions: {
-    provider: ModelProviderId;
-    label: string;
-    model: string;
-  }[];
   onItemUpdate: (itemId: string, output: SimpleSkillOutput) => void;
   onMessagesSync: (itemId: string, messages: StoredTextMessage[]) => void;
   onClose: () => void;
@@ -30,7 +24,6 @@ export function ItemPanel({
   item,
   skillName,
   currentStage,
-  modelOptions,
   onItemUpdate,
   onMessagesSync,
   onClose,
@@ -67,7 +60,6 @@ export function ItemPanel({
           itemId={item.id}
           skillName={skillName}
           initialMessages={item.messages}
-          modelOptions={modelOptions}
           onItemUpdate={(output) => onItemUpdate(item.id, output)}
           onMessagesSync={(messages) => onMessagesSync(item.id, messages)}
         />

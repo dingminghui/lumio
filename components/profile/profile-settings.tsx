@@ -2,69 +2,24 @@
 
 import { useState } from "react";
 
-import {
-  saveUserProfileNameAction,
-  validateAndSaveImageModelConfigAction,
-  validateAndSaveModelConfigAction,
-} from "@/app/profile/actions";
-import { ImageModelConfigSection } from "@/components/profile/image-model-config-section";
-import { ModelConfigSection } from "@/components/profile/model-config-section";
+import { saveUserProfileNameAction } from "@/app/profile/actions";
 import { PersonalCenterSection } from "@/components/profile/personal-center-section";
-import { ProfileSettingsNav } from "@/components/profile/profile-settings-nav";
-import type {
-  ImageModelConfigRow,
-  ModelConfigRow,
-  ProfileImageModelConfig,
-  ProfileModelConfig,
-  SaveStatus,
-} from "@/components/profile/profile-settings-types";
-import type { ModelProviderId } from "@/lib/model-providers";
+import type { SaveStatus } from "@/components/profile/profile-settings-types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const profileTabs = [{ value: "personal-center", label: "个人中心" }] as const;
 
 type ProfileSettingsProps = {
   profile: {
     name: string;
   };
-  modelConfigs: ProfileModelConfig[];
-  imageModelConfig: ProfileImageModelConfig;
 };
 
-function getInitialModelRows(modelConfigs: ProfileModelConfig[]): ModelConfigRow[] {
-  return modelConfigs.map((config) => ({
-    ...config,
-    apiKey: "",
-    status: config.validatedAt ? "saved" : "idle",
-    message: "",
-  }));
-}
-
-function getInitialImageModelRow(
-  imageModelConfig: ProfileImageModelConfig,
-): ImageModelConfigRow {
-  return {
-    ...imageModelConfig,
-    apiToken: "",
-    status: imageModelConfig.validatedAt ? "saved" : "idle",
-    message: "",
-  };
-}
-
-export function ProfileSettings({
-  profile,
-  modelConfigs,
-  imageModelConfig,
-}: ProfileSettingsProps) {
+export function ProfileSettings({ profile }: ProfileSettingsProps) {
   const [name, setName] = useState(profile.name);
   const [savedName, setSavedName] = useState(profile.name);
   const [nameStatus, setNameStatus] = useState<SaveStatus>("idle");
   const [nameMessage, setNameMessage] = useState("");
-  const [rows, setRows] = useState(() => getInitialModelRows(modelConfigs));
-  const [imageRow, setImageRow] = useState(() =>
-    getInitialImageModelRow(imageModelConfig),
-  );
-  const [visibleKeys, setVisibleKeys] = useState<Record<ModelProviderId, boolean>>({
-    deepseek: false,
-  });
-  const [isImageTokenVisible, setIsImageTokenVisible] = useState(false);
 
   async function handleNameBlur() {
     if (name.trim() === savedName) {
@@ -92,129 +47,45 @@ export function ProfileSettings({
     setNameStatus("idle");
   }
 
-  function updateRow(provider: ModelProviderId, updates: Partial<ModelConfigRow>) {
-    setRows((currentRows) =>
-      currentRows.map((row) =>
-        row.provider === provider ? { ...row, ...updates } : row,
-      ),
-    );
-  }
-
-  async function handleModelSave(provider: ModelProviderId) {
-    const row = rows.find((currentRow) => currentRow.provider === provider);
-
-    if (!row) {
-      return;
-    }
-
-    updateRow(provider, { status: "saving", message: "" });
-
-    const result = await validateAndSaveModelConfigAction(provider, {
-      apiKey: row.apiKey,
-    });
-
-    if (result.ok) {
-      updateRow(provider, {
-        apiKey: "",
-        hasApiKey: result.config.hasApiKey,
-        validatedAt: result.config.validatedAt,
-        status: "saved",
-        message: "",
-      });
-      return;
-    }
-
-    updateRow(provider, {
-      status: "error",
-      message: result.message,
-    });
-  }
-
-  function handleApiKeyChange(provider: ModelProviderId, apiKey: string) {
-    updateRow(provider, {
-      apiKey,
-      status: "idle",
-      message: "",
-    });
-  }
-
-  function toggleKeyVisibility(provider: ModelProviderId) {
-    setVisibleKeys((currentVisibility) => ({
-      ...currentVisibility,
-      [provider]: !currentVisibility[provider],
-    }));
-  }
-
-  function updateImageRow(updates: Partial<ImageModelConfigRow>) {
-    setImageRow((currentRow) => ({ ...currentRow, ...updates }));
-  }
-
-  async function handleImageModelSave() {
-    updateImageRow({ status: "saving", message: "" });
-
-    const result = await validateAndSaveImageModelConfigAction({
-      accountId: imageRow.accountId,
-      apiToken: imageRow.apiToken,
-    });
-
-    if (result.ok) {
-      updateImageRow({
-        accountId: result.config.accountId,
-        apiToken: "",
-        hasApiToken: result.config.hasApiToken,
-        model: result.config.model,
-        validatedAt: result.config.validatedAt,
-        status: "saved",
-        message: "",
-      });
-      return;
-    }
-
-    updateImageRow({
-      status: "error",
-      message: result.message,
-    });
-  }
-
   return (
     <div className="mx-auto flex w-full max-w-[calc(100vw-8rem)] min-w-0 flex-col gap-6 sm:max-w-6xl">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-normal">我的</h1>
-        <p className="text-sm text-muted-foreground">管理个人信息与模型服务配置。</p>
+        <p className="text-sm text-muted-foreground">管理个人信息。</p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)]">
-        <ProfileSettingsNav />
+      <Tabs
+        defaultValue={profileTabs[0].value}
+        orientation="vertical"
+        className="flex w-full min-w-0 flex-col gap-4 lg:flex-row lg:gap-6"
+      >
+        <TabsList
+          variant="line"
+          className="lumio-scrollbar h-fit w-full shrink-0 flex-row overflow-x-auto bg-card p-1 lg:w-48 lg:flex-col lg:items-stretch lg:overflow-visible"
+        >
+          {profileTabs.map((tab) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              className="shrink-0 justify-center px-3 py-2 lg:w-full lg:justify-start"
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-        <div className="flex min-w-0 flex-col gap-8">
-          <PersonalCenterSection
-            name={name}
-            status={nameStatus}
-            message={nameMessage}
-            onNameBlur={handleNameBlur}
-            onNameChange={handleNameChange}
-          />
-          <ModelConfigSection
-            rows={rows}
-            visibleKeys={visibleKeys}
-            onApiKeyBlur={handleModelSave}
-            onApiKeyChange={handleApiKeyChange}
-            onKeyVisibilityToggle={toggleKeyVisibility}
-          />
-          <ImageModelConfigSection
-            row={imageRow}
-            isTokenVisible={isImageTokenVisible}
-            onAccountIdChange={(accountId) =>
-              updateImageRow({ accountId, status: "idle", message: "" })
-            }
-            onApiTokenChange={(apiToken) =>
-              updateImageRow({ apiToken, status: "idle", message: "" })
-            }
-            onKeyVisibilityToggle={() => setIsImageTokenVisible((current) => !current)}
-            onTestConnection={handleImageModelSave}
-          />
+        <div className="min-w-0 flex-1">
+          <TabsContent value="personal-center" className="mt-0">
+            <PersonalCenterSection
+              name={name}
+              status={nameStatus}
+              message={nameMessage}
+              onNameBlur={handleNameBlur}
+              onNameChange={handleNameChange}
+            />
+          </TabsContent>
         </div>
-      </div>
+      </Tabs>
     </div>
   );
 }

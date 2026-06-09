@@ -23,7 +23,6 @@ import type { CanvasItemWithMessages } from "@/db/queries";
 import { deriveSkillStage } from "@/lib/skills/core/stage-engine";
 import type { SerializableSkillManifest } from "@/lib/skills/serializable-manifest";
 import { cn } from "@/lib/utils";
-import type { ModelProviderId } from "@/lib/model-providers";
 import type { CanvasEdgeRow, SimpleSkillOutput } from "@/types/skill";
 
 const CANVAS_ONLY_LAYOUT = { canvas: 100 };
@@ -36,11 +35,6 @@ type CanvasHomeProps = {
   initialEdges: CanvasEdgeRow[];
   skillManifests: SerializableSkillManifest[];
   skillOptions: { id: string; name: string }[];
-  modelOptions: {
-    provider: ModelProviderId;
-    label: string;
-    model: string;
-  }[];
   initialViewport: Viewport;
   bgColor: string;
   showDots: boolean;
@@ -61,7 +55,6 @@ export function CanvasHome({
   initialEdges,
   skillManifests,
   skillOptions,
-  modelOptions,
   initialViewport,
   bgColor,
   showDots,
@@ -313,7 +306,6 @@ export function CanvasHome({
                 item={activeItem}
                 skillName={activeManifest.name}
                 currentStage={currentStage}
-                modelOptions={modelOptions}
                 onItemUpdate={handleItemUpdate}
                 onMessagesSync={handleMessagesSync}
                 onClose={itemPanel.close}

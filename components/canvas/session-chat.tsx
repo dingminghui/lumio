@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import { syncItemMessagesAction } from "@/app/projects/actions";
 
@@ -20,11 +20,6 @@ import {
 import {
   PromptInput,
   PromptInputFooter,
-  PromptInputSelect,
-  PromptInputSelectContent,
-  PromptInputSelectItem,
-  PromptInputSelectTrigger,
-  PromptInputSelectValue,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
@@ -40,7 +35,6 @@ import {
   type LumioUIMessage,
 } from "@/utils/session-message";
 import { cn } from "@/lib/utils";
-import type { ModelProviderId } from "@/lib/model-providers";
 import type { SimpleSkillOutput } from "@/types/skill";
 import type { StoredTextMessage } from "@/utils/session-message";
 
@@ -49,11 +43,6 @@ type ItemChatProps = {
   itemId: string;
   skillName: string;
   initialMessages: StoredTextMessage[];
-  modelOptions: {
-    provider: ModelProviderId;
-    label: string;
-    model: string;
-  }[];
   onItemUpdate: (output: SimpleSkillOutput) => void;
   onMessagesSync: (messages: StoredTextMessage[]) => void;
 };
@@ -83,13 +72,9 @@ export function ItemChat({
   itemId,
   skillName,
   initialMessages,
-  modelOptions,
   onItemUpdate,
   onMessagesSync,
 }: ItemChatProps) {
-  const [selectedProvider, setSelectedProvider] = useState(
-    modelOptions[0]?.provider ?? "",
-  );
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -158,16 +143,9 @@ export function ItemChat({
   const handleSubmit = useCallback(
     async ({ text }: { text: string }) => {
       clearError();
-      await sendMessage(
-        { text },
-        {
-          body: {
-            provider: selectedProvider,
-          },
-        },
-      );
+      await sendMessage({ text });
     },
-    [clearError, selectedProvider, sendMessage],
+    [clearError, sendMessage],
   );
 
   return (
@@ -209,30 +187,6 @@ export function ItemChat({
         />
         <PromptInputFooter>
           <PromptInputTools className="flex-wrap gap-2">
-            <div className="flex min-w-0 items-center">
-              <PromptInputSelect
-                value={selectedProvider}
-                onValueChange={(value) => setSelectedProvider(value as ModelProviderId)}
-              >
-                <PromptInputSelectTrigger
-                  aria-label="选择模型"
-                  size="sm"
-                  className="max-w-36 border-transparent bg-muted shadow-none hover:bg-muted/80"
-                >
-                  <PromptInputSelectValue placeholder="选择模型" />
-                </PromptInputSelectTrigger>
-                <PromptInputSelectContent>
-                  {modelOptions.map((option) => (
-                    <PromptInputSelectItem
-                      key={option.provider}
-                      value={option.provider}
-                    >
-                      {option.label}
-                    </PromptInputSelectItem>
-                  ))}
-                </PromptInputSelectContent>
-              </PromptInputSelect>
-            </div>
             <span className="text-xs text-muted-foreground">{skillName}</span>
             <span className="text-xs text-muted-foreground">
               {status === "streaming" ? "正在回复..." : ""}

@@ -21,7 +21,6 @@ const defaultViewportJson = JSON.stringify({ x: 0, y: 0, zoom: 1 }).replaceAll(
 );
 
 export const messageRole = pgEnum("message_role", SESSION_MESSAGE_ROLES);
-export const modelProvider = pgEnum("model_provider", ["deepseek"]);
 
 export const projects = pgTable("projects", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -94,22 +93,6 @@ export const itemMessages = pgTable(
 export const userProfile = pgTable("user_profile", {
   id: text("id").primaryKey().default("default"),
   name: text("name").notNull().default(""),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export const modelConfigs = pgTable("model_configs", {
-  provider: modelProvider("provider").primaryKey(),
-  apiKeyEncrypted: text("api_key_encrypted").notNull(),
-  validatedAt: timestamp("validated_at", { withTimezone: true }),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
-
-export const imageModelConfigs = pgTable("image_model_configs", {
-  id: text("id").primaryKey().default("cloudflare-workers-ai"),
-  accountId: text("account_id").notNull(),
-  apiTokenEncrypted: text("api_token_encrypted").notNull(),
-  model: text("model").notNull(),
-  validatedAt: timestamp("validated_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
