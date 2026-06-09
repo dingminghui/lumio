@@ -4,7 +4,7 @@ import type { LucideIcon } from "lucide-react";
 // Skill categories
 // ---------------------------------------------------------------------------
 
-export const SKILL_CATEGORIES = ["all", "document", "image"] as const;
+export const SKILL_CATEGORIES = ["all", "document"] as const;
 
 export type SkillCategory = Exclude<(typeof SKILL_CATEGORIES)[number], "all">;
 

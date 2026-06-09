@@ -48,11 +48,9 @@ type FlowCanvasProps = {
     height: number,
   ) => void;
   onItemContentChange: (itemId: string, content: string) => void;
-  onItemGenerate?: (itemId: string) => void;
   onEdgeAdd: (edge: CanvasEdgeRow) => void;
   onEdgeRemove: (edgeId: string) => void;
   onToggleItemPanel: () => void;
-  upstreamDocumentCounts?: Record<string, number>;
 };
 
 export function FlowCanvas({
@@ -73,11 +71,9 @@ export function FlowCanvas({
   onItemDelete,
   onItemPositionChange,
   onItemContentChange,
-  onItemGenerate,
   onEdgeAdd,
   onEdgeRemove,
   onToggleItemPanel,
-  upstreamDocumentCounts,
 }: FlowCanvasProps) {
   const nodeTypes = useMemo(() => getSkillNodeTypes(), []);
 
@@ -116,10 +112,8 @@ export function FlowCanvas({
     onItemPositionChange,
     onItemContentChange,
     onItemSelect,
-    onItemGenerate,
     onEdgeAdd,
     onEdgeRemove,
-    upstreamDocumentCounts,
   });
 
   useKey({ key: "1", shiftKey: true }, (event) => {

@@ -65,10 +65,8 @@ type UseFlowCanvasStateOptions = {
   ) => void;
   onItemContentChange: (itemId: string, content: string) => void;
   onItemSelect: (itemId: string) => void;
-  onItemGenerate?: (itemId: string) => void;
   onEdgeAdd: (edge: CanvasEdgeRow) => void;
   onEdgeRemove: (edgeId: string) => void;
-  upstreamDocumentCounts?: Record<string, number>;
 };
 
 export function useFlowCanvasState({
@@ -85,24 +83,15 @@ export function useFlowCanvasState({
   onItemPositionChange,
   onItemContentChange,
   onItemSelect,
-  onItemGenerate,
   onEdgeAdd,
   onEdgeRemove,
-  upstreamDocumentCounts = {},
 }: UseFlowCanvasStateOptions) {
   const hasAutoFitRef = useRef(false);
   const scheduleLayoutSave = useDebouncedCallback(LAYOUT_SAVE_DEBOUNCE_MS);
   const scheduleViewportSave = useDebouncedCallback(VIEWPORT_SAVE_DEBOUNCE_MS);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(
-    itemsToNodes(
-      items,
-      skillNames,
-      activeItemId,
-      NOOP_NODE_HANDLERS,
-      skillNodeTypes,
-      upstreamDocumentCounts,
-    ),
+    itemsToNodes(items, skillNames, activeItemId, NOOP_NODE_HANDLERS, skillNodeTypes),
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(
     edgesToFlow(initialEdges, activeItemId),
@@ -290,9 +279,8 @@ export function useFlowCanvasState({
       onResizeEnd: handleResizeEnd,
       onContentChange: onItemContentChange,
       onStartDocumentEdit: startDocumentEdit,
-      onGenerate: onItemGenerate,
     }),
-    [handleResizeEnd, onItemContentChange, onItemGenerate, startDocumentEdit, updateNodeSize],
+    [handleResizeEnd, onItemContentChange, startDocumentEdit, updateNodeSize],
   );
 
   useEffect(() => {
@@ -304,18 +292,9 @@ export function useFlowCanvasState({
         activeItemId,
         nodeHandlers,
         skillNodeTypes,
-        upstreamDocumentCounts,
       ),
     );
-  }, [
-    activeItemId,
-    items,
-    nodeHandlers,
-    setNodes,
-    skillNames,
-    skillNodeTypes,
-    upstreamDocumentCounts,
-  ]);
+  }, [activeItemId, items, nodeHandlers, setNodes, skillNames, skillNodeTypes]);
 
   useEffect(() => {
     setEdges(edgesToFlow(initialEdges, activeItemId));

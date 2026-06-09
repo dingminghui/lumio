@@ -22,7 +22,6 @@ type ItemPanelProps = {
   }[];
   onItemUpdate: (itemId: string, output: SimpleSkillOutput) => void;
   onMessagesSync: (itemId: string, messages: StoredTextMessage[]) => void;
-  onGenerationRevert?: (itemId: string) => void;
   onClose: () => void;
 };
 
@@ -34,7 +33,6 @@ export function ItemPanel({
   modelOptions,
   onItemUpdate,
   onMessagesSync,
-  onGenerationRevert,
   onClose,
 }: ItemPanelProps) {
   return (
@@ -72,7 +70,6 @@ export function ItemPanel({
           modelOptions={modelOptions}
           onItemUpdate={(output) => onItemUpdate(item.id, output)}
           onMessagesSync={(messages) => onMessagesSync(item.id, messages)}
-          onGenerationRevert={() => onGenerationRevert?.(item.id)}
         />
       </div>
     </aside>

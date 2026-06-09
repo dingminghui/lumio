@@ -30,7 +30,10 @@ import {
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
 import { simpleSkillOutputSchema } from "@/lib/skills/ai-output-schema";
+import { nodeChatResultSchema } from "@/lib/skills/node-chat-schema";
 import {
+  getSkillOutputFromNodeChatResult,
+  getSkillOutputFromUiMessage,
   getUiMessageText,
   toStoredTextMessages,
   toUiMessage,
@@ -53,8 +56,27 @@ type ItemChatProps = {
   }[];
   onItemUpdate: (output: SimpleSkillOutput) => void;
   onMessagesSync: (messages: StoredTextMessage[]) => void;
-  onGenerationRevert?: () => void;
 };
+
+function normalizeFinishedMessagesForSync(
+  messages: LumioUIMessage[],
+  isAbort: boolean,
+) {
+  if (!isAbort || messages.length === 0) {
+    return messages;
+  }
+
+  const lastMessage = messages[messages.length - 1];
+  const hasNodeResult = lastMessage.parts.some(
+    (part) => part.type === "data-node-chat-result",
+  );
+
+  if (lastMessage.role === "assistant" && !hasNodeResult) {
+    return messages.slice(0, -1);
+  }
+
+  return messages;
+}
 
 export function ItemChat({
   projectId,
@@ -64,7 +86,6 @@ export function ItemChat({
   modelOptions,
   onItemUpdate,
   onMessagesSync,
-  onGenerationRevert,
 }: ItemChatProps) {
   const [selectedProvider, setSelectedProvider] = useState(
     modelOptions[0]?.provider ?? "",
@@ -82,27 +103,54 @@ export function ItemChat({
       messages: initialMessages.map(toUiMessage),
       transport,
       dataPartSchemas: {
+        "node-chat-result": nodeChatResultSchema,
         "skill-output": simpleSkillOutputSchema,
       },
       onData: (dataPart) => {
         if (dataPart.type === "data-skill-output") {
           onItemUpdate(dataPart.data);
+          return;
+        }
+
+        if (dataPart.type === "data-node-chat-result") {
+          const output = getSkillOutputFromNodeChatResult(dataPart.data);
+
+          if (output) {
+            onItemUpdate(output);
+          }
         }
       },
       onFinish: async ({ messages: finishedMessages, isError, isAbort }) => {
-        if (isError || isAbort) {
-          onGenerationRevert?.();
+        if (isError) {
           return;
+        }
+
+        const normalizedMessages = normalizeFinishedMessagesForSync(
+          finishedMessages,
+          isAbort,
+        );
+
+        if (!isAbort) {
+          const lastAssistant = [...normalizedMessages]
+            .reverse()
+            .find((message) => message.role === "assistant");
+          const output = lastAssistant
+            ? getSkillOutputFromUiMessage(lastAssistant)
+            : null;
+
+          if (output) {
+            onItemUpdate(output);
+          }
         }
 
         try {
           const persisted = await syncItemMessagesAction(
             itemId,
-            toStoredTextMessages(finishedMessages),
+            toStoredTextMessages(normalizedMessages),
           );
           onMessagesSync(persisted);
         } catch {
-          onMessagesSync(toStoredTextMessages(finishedMessages));
+          onMessagesSync(toStoredTextMessages(normalizedMessages));
         }
       },
     });
@@ -123,7 +171,7 @@ export function ItemChat({
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
       <Conversation className="bg-background">
         <ConversationContent>
           {messages.length ? (

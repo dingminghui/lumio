@@ -19,7 +19,7 @@ export function Message({ className, from, ...props }: MessageProps) {
   return (
     <div
       className={cn(
-        "group flex w-full max-w-[95%] flex-col gap-2",
+        "group flex w-full max-w-[95%] min-w-0 flex-col gap-2",
         from === "user" ? "is-user ml-auto items-end" : "is-assistant items-start",
         className,
       )}
@@ -57,7 +57,10 @@ export const MessageResponse = memo(function MessageResponse({
   return (
     <Streamdown
       className={cn(
-        "max-w-none leading-6 [&_a]:text-primary [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_pre]:my-3 [&_ul]:ml-5 [&_ul]:list-disc [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        "w-full max-w-full min-w-0 leading-6 [&_a]:text-primary [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_ol]:ml-5 [&_ol]:list-decimal [&_p]:my-2 [&_pre]:my-3 [&_ul]:ml-5 [&_ul]:list-disc [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        "[&_[data-streamdown=code-block]]:max-w-full [&_[data-streamdown=code-block]]:min-w-0",
+        "[&_[data-streamdown=code-block-body]]:max-w-full [&_[data-streamdown=code-block-body]]:overflow-x-auto",
+        "[&_[data-streamdown=code-block-body]_pre]:max-w-full",
         className,
       )}
       plugins={streamdownPlugins}

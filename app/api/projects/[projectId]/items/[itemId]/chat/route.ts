@@ -1,29 +1,20 @@
-import { convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse } from "ai";
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+} from "ai";
 
 import { createItemMessage, getCanvasItem, updateCanvasItemState } from "@/db/queries";
 import { getDecryptedModelConfig } from "@/db/profile-queries";
+import { documentGraph } from "@/lib/graph/document-graph";
 import { createConfiguredProvider, type ModelProviderId } from "@/lib/model-providers";
 import { bootstrapSkillRegistry, getSkillRegistry } from "@/lib/skills/bootstrap";
-import {
-  createSkillOutputErrorMessage,
-  generateSkillOutput,
-} from "@/lib/skills/generate-skill-output";
-import { resolveImageSkillOutput } from "@/lib/skills/image/runtime";
-import { LONG_IMAGE_SKILL_ID } from "@/lib/skills/long-image";
-import {
-  createLongImageContextPrompt,
-  createLongImageProgressMessage,
-  getLongImageGenerationContext,
-  resolveLongImageSkillOutput,
-  type LongImageGenerationContext,
-} from "@/lib/skills/long-image/runtime";
-import { createSkillSystemPrompt } from "@/lib/skills/system-prompt";
+import type { NodeChatResult, NodeToolCall } from "@/lib/skills/node-chat-schema";
 import {
   getUiMessageText,
   toTextOnlyUiMessages,
   type LumioUIMessage,
 } from "@/utils/session-message";
-import type { SimpleSkillOutput } from "@/types/skill";
 
 export const maxDuration = 60;
 
@@ -34,46 +25,19 @@ type RouteContext = {
   }>;
 };
 
-function createImmediateSkillOutputResponse({
-  messages,
-  itemId,
-  output,
+function createWriteToolCall({
+  status,
+  message,
 }: {
-  messages: LumioUIMessage[];
-  itemId: string;
-  output: SimpleSkillOutput;
-}) {
-  const stream = createUIMessageStream<LumioUIMessage>({
-    async execute({ writer }) {
-      const messagePartId = "skill-message";
-
-      writer.write({ type: "text-start", id: messagePartId });
-      writer.write({
-        type: "text-delta",
-        id: messagePartId,
-        delta: output.message,
-      });
-      writer.write({ type: "text-end", id: messagePartId });
-
-      await createItemMessage({
-        itemId,
-        role: "assistant",
-        content: output.message,
-      });
-
-      await updateCanvasItemState(itemId, output.state);
-
-      writer.write({
-        type: "data-skill-output",
-        id: "skill-output",
-        data: output,
-      });
-    },
-    originalMessages: messages,
-    onError: () => "消息处理失败，请重试。",
-  });
-
-  return createUIMessageStreamResponse({ stream });
+  status: NodeToolCall["status"];
+  message: string;
+}): NodeToolCall {
+  return {
+    name: "write_node_state",
+    status,
+    progress: [message],
+    summary: message,
+  };
 }
 
 export async function POST(request: Request, { params }: RouteContext) {
@@ -108,39 +72,10 @@ export async function POST(request: Request, { params }: RouteContext) {
 
   await createItemMessage({
     itemId,
+    projectId,
     role: "user",
     content: userContent,
   });
-
-  let contextPrompt = "";
-  let longImageContext: LongImageGenerationContext | null = null;
-  let longImageProgressMessage = "";
-
-  if (manifest.id === LONG_IMAGE_SKILL_ID) {
-    const context = await getLongImageGenerationContext(projectId, itemId);
-    longImageContext = context;
-
-    if (context.documents.length === 0) {
-      const message = "请先连接至少一个有内容的文档节点后再生成长图";
-      const output: SimpleSkillOutput = {
-        message,
-        state: {
-          ...item.state,
-          status: "error",
-          error: message,
-        },
-      };
-
-      return createImmediateSkillOutputResponse({
-        messages,
-        itemId,
-        output,
-      });
-    }
-
-    contextPrompt = createLongImageContextPrompt(context);
-    longImageProgressMessage = createLongImageProgressMessage(context);
-  }
 
   let modelConfig;
 
@@ -165,15 +100,15 @@ export async function POST(request: Request, { params }: RouteContext) {
     apiKey: modelConfig.apiKey,
     baseUrl: modelConfig.baseUrl,
   });
+  const model = configuredProvider.chatModel(modelConfig.model);
+  const modelMessages = await convertToModelMessages(toTextOnlyUiMessages(messages));
 
   const stream = createUIMessageStream<LumioUIMessage>({
     async execute({ writer }) {
       const messagePartId = "skill-message";
       let streamedMessage = "";
 
-      writer.write({ type: "text-start", id: messagePartId });
-
-      function appendMessageDelta(delta: string) {
+      function writeDelta(delta: string) {
         if (!delta) {
           return;
         }
@@ -186,135 +121,74 @@ export async function POST(request: Request, { params }: RouteContext) {
         streamedMessage += delta;
       }
 
-      function writeMessageDelta(nextMessage: string) {
-        if (!nextMessage || nextMessage === streamedMessage) {
-          return;
-        }
+      writer.write({ type: "text-start", id: messagePartId });
 
-        if (!nextMessage.startsWith(streamedMessage)) {
-          return;
-        }
-
-        writer.write({
-          type: "text-delta",
-          id: messagePartId,
-          delta: nextMessage.slice(streamedMessage.length),
-        });
-        streamedMessage = nextMessage;
-      }
-
-      const modelMessages = await convertToModelMessages(
-        toTextOnlyUiMessages(messages),
-      );
-      const system = createSkillSystemPrompt({
-        manifest,
-        itemState: item.state,
-        context: contextPrompt,
-      });
-      const suppressPartialMessage = manifest.id === LONG_IMAGE_SKILL_ID;
-
-      let output;
-
-      try {
-        output = await generateSkillOutput({
-          model: configuredProvider.chatModel(modelConfig.model),
-          system,
+      const graphState = await documentGraph.invoke(
+        {
           messages: modelMessages,
-          initialMessage: longImageProgressMessage,
-          suppressPartialMessage,
-          onPartialMessage: (nextMessage) => {
-            if (!suppressPartialMessage) {
-              writeMessageDelta(nextMessage);
-            } else if (!streamedMessage && longImageProgressMessage) {
-              appendMessageDelta(longImageProgressMessage);
-            }
-          },
-        });
+          manifest,
+          itemState: item.state,
+          model,
+          latestUserMessage: userContent,
+        },
+        { configurable: { onText: writeDelta } },
+      );
 
-        if (!suppressPartialMessage) {
-          writeMessageDelta(output.message);
-        }
-      } catch (error) {
-        const fallbackMessage = createSkillOutputErrorMessage({
-          error,
-          streamedMessage,
-        });
-        const errorOutput: SimpleSkillOutput = {
-          message: fallbackMessage,
-          state: {
-            ...item.state,
-            status: "error",
-            error: fallbackMessage,
-          },
-        };
+      const graphResult = graphState.result;
 
-        writeMessageDelta(
-          suppressPartialMessage && streamedMessage
-            ? `\n${fallbackMessage}`
-            : fallbackMessage,
-        );
+      if (!graphResult) {
         writer.write({ type: "text-end", id: messagePartId });
-
-        await createItemMessage({
-          itemId,
-          role: "assistant",
-          content: fallbackMessage,
-        });
-
-        writer.write({
-          type: "data-skill-output",
-          id: "skill-output",
-          data: errorOutput,
-        });
-
-        try {
-          await updateCanvasItemState(itemId, errorOutput.state);
-        } catch (updateError) {
-          console.error("Failed to update canvas item state after error", updateError);
-        }
-
-        console.error("Failed to generate structured skill output", error);
         return;
       }
 
-      if (manifest.id === LONG_IMAGE_SKILL_ID && longImageContext) {
-        output = resolveLongImageSkillOutput({
-          output,
-          context: longImageContext,
-        });
+      const finalResult: NodeChatResult = {
+        ...graphResult,
+        toolCalls: [...graphResult.toolCalls],
+      };
+      let shouldSendSkillOutput =
+        finalResult.write === "none" && Boolean(finalResult.output);
 
-        if (output.state.status === "error") {
-          appendMessageDelta(`\n${output.message}`);
+      if (finalResult.write === "commit" && finalResult.output) {
+        try {
+          await updateCanvasItemState(itemId, finalResult.output.state);
+          const message = "节点状态已写入";
+
+          writeDelta(`\n${message}`);
+          finalResult.toolCalls.push(
+            createWriteToolCall({ status: "success", message }),
+          );
+          shouldSendSkillOutput = true;
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? `节点状态写入失败：${error.message}`
+              : "节点状态写入失败";
+
+          writeDelta(`\n${message}`);
+          finalResult.toolCalls.push(createWriteToolCall({ status: "error", message }));
+          finalResult.output = undefined;
+          console.error("Failed to update canvas item state", error);
         }
       }
 
-      output = await resolveImageSkillOutput({
-        skillId: manifest.id,
-        output,
-        onMessage: writeMessageDelta,
-      });
+      if (!streamedMessage.trim()) {
+        writeDelta(finalResult.message);
+      }
 
       writer.write({ type: "text-end", id: messagePartId });
 
-      await createItemMessage({
-        itemId,
-        role: "assistant",
-        content: JSON.stringify(output),
-      });
-
       writer.write({
-        type: "data-skill-output",
-        id: "skill-output",
-        data: output,
+        type: "data-node-chat-result",
+        id: "node-chat-result",
+        data: finalResult,
       });
 
-      try {
-        await updateCanvasItemState(itemId, output.state);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "无法更新节点状态";
-        writeMessageDelta(`${streamedMessage}\n\n状态更新失败：${errorMessage}`);
-        console.error("Failed to update canvas item state", error);
+      if (shouldSendSkillOutput && finalResult.output) {
+        writer.write({
+          type: "data-skill-output",
+          id: "skill-output",
+          data: finalResult.output,
+        });
       }
     },
     originalMessages: messages,

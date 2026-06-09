@@ -1,11 +1,20 @@
 import type { UIMessage } from "ai";
 
 import { aiOutputSchema } from "@/lib/skills/ai-output-schema";
+import {
+  nodeChatResultSchema,
+  type NodeChatResult,
+} from "@/lib/skills/node-chat-schema";
 import type { AIOutput } from "@/types/skill";
 
+type LumioMessageMetadata = {
+  createdAt?: string;
+};
+
 export type LumioUIMessage = UIMessage<
-  never,
+  LumioMessageMetadata,
   {
+    "node-chat-result": NodeChatResult;
     "skill-output": AIOutput;
   }
 >;
@@ -57,7 +66,30 @@ function parseStoredAIOutput(content: string) {
   return null;
 }
 
+function parseStoredNodeChatResult(content: string) {
+  try {
+    const parsed = JSON.parse(content);
+    const result = nodeChatResultSchema.safeParse(parsed);
+
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatNodeChatResultText(result: NodeChatResult) {
+  const progress = result.toolCalls.flatMap((toolCall) => toolCall.progress);
+
+  return [...progress, result.message].filter(Boolean).join("\n\n");
+}
+
 function getAssistantDisplayText(content: string) {
+  const nodeChatResult = parseStoredNodeChatResult(content);
+
+  if (nodeChatResult) {
+    return formatNodeChatResultText(nodeChatResult);
+  }
+
   const parsed = parseStoredAIOutput(content);
 
   if (parsed?.message) {
@@ -78,6 +110,24 @@ function getAssistantDisplayText(content: string) {
 }
 
 export function toUiMessage(message: StoredTextMessage): LumioUIMessage {
+  const nodeChatResult =
+    message.role === "assistant" ? parseStoredNodeChatResult(message.content) : null;
+
+  if (nodeChatResult) {
+    return {
+      id: message.id,
+      role: message.role,
+      metadata: { createdAt: message.createdAt },
+      parts: [
+        { type: "text", text: formatNodeChatResultText(nodeChatResult) },
+        { type: "data-node-chat-result", data: nodeChatResult },
+        ...(nodeChatResult.output
+          ? [{ type: "data-skill-output" as const, data: nodeChatResult.output }]
+          : []),
+      ],
+    };
+  }
+
   const output =
     message.role === "assistant" ? parseStoredAIOutput(message.content) : null;
 
@@ -85,6 +135,7 @@ export function toUiMessage(message: StoredTextMessage): LumioUIMessage {
     return {
       id: message.id,
       role: message.role,
+      metadata: { createdAt: message.createdAt },
       parts: [
         { type: "text", text: output.message },
         ...(output.output
@@ -98,6 +149,7 @@ export function toUiMessage(message: StoredTextMessage): LumioUIMessage {
     return {
       id: message.id,
       role: message.role,
+      metadata: { createdAt: message.createdAt },
       parts: [{ type: "text", text: getAssistantDisplayText(message.content) }],
     };
   }
@@ -105,6 +157,7 @@ export function toUiMessage(message: StoredTextMessage): LumioUIMessage {
   return {
     id: message.id,
     role: message.role,
+    metadata: { createdAt: message.createdAt },
     parts: [{ type: "text", text: message.content }],
   };
 }
@@ -128,7 +181,10 @@ export function toTextOnlyUiMessages(messages: LumioUIMessage[]): LumioUIMessage
   const textOnlyMessages: LumioUIMessage[] = [];
 
   for (const message of messages) {
-    const text = getUiMessageText(message).trim();
+    const text =
+      message.role === "assistant"
+        ? getNodeChatResult(message)?.message?.trim() || getUiMessageText(message).trim()
+        : getUiMessageText(message).trim();
 
     if (!text || message.role === "system") {
       continue;
@@ -137,6 +193,7 @@ export function toTextOnlyUiMessages(messages: LumioUIMessage[]): LumioUIMessage
     textOnlyMessages.push({
       id: message.id,
       role: message.role,
+      metadata: message.metadata,
       parts: [{ type: "text", text }],
     });
   }
@@ -150,6 +207,39 @@ function getSkillOutput(message: LumioUIMessage) {
   return outputPart?.data ?? null;
 }
 
+function getNodeChatResult(message: LumioUIMessage) {
+  const resultPart = message.parts.find(
+    (part) => part.type === "data-node-chat-result",
+  );
+
+  return resultPart?.data ?? null;
+}
+
+export function getSkillOutputFromNodeChatResult(
+  result: NodeChatResult,
+): AIOutput | null {
+  if (result.write === "commit" && result.output) {
+    return result.output;
+  }
+
+  return null;
+}
+
+/** 从 UI 消息中提取应写入画布的 skill output（优先 data-skill-output，其次 commit 的 node-chat-result） */
+export function getSkillOutputFromUiMessage(
+  message: LumioUIMessage,
+): AIOutput | null {
+  const skillOutput = getSkillOutput(message);
+
+  if (skillOutput) {
+    return skillOutput;
+  }
+
+  const nodeChatResult = getNodeChatResult(message);
+
+  return nodeChatResult ? getSkillOutputFromNodeChatResult(nodeChatResult) : null;
+}
+
 export function toStoredTextMessages(messages: LumioUIMessage[]): StoredTextMessage[] {
   const now = new Date().toISOString();
 
@@ -161,10 +251,12 @@ export function toStoredTextMessages(messages: LumioUIMessage[]): StoredTextMess
       id: message.id,
       role: message.role,
       content:
-        message.role === "assistant" && getSkillOutput(message)
-          ? JSON.stringify(getSkillOutput(message))
-          : getUiMessageText(message).trim(),
-      createdAt: now,
+        message.role === "assistant" && getNodeChatResult(message)
+          ? JSON.stringify(getNodeChatResult(message))
+          : message.role === "assistant" && getSkillOutput(message)
+            ? JSON.stringify(getSkillOutput(message))
+            : getUiMessageText(message).trim(),
+      createdAt: message.metadata?.createdAt ?? now,
     }))
     .filter((message) => message.content.length > 0);
 }

@@ -32,7 +32,7 @@ export type ConversationContentProps = ComponentProps<typeof StickToBottom.Conte
 export function ConversationContent({ className, ...props }: ConversationContentProps) {
   return (
     <StickToBottom.Content
-      className={cn("flex flex-col gap-4 p-4", className)}
+      className={cn("flex min-w-0 flex-col gap-4 p-4", className)}
       {...props}
     />
   );

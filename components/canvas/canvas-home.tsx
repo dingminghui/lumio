@@ -18,12 +18,9 @@ import {
 } from "@/components/ui/resizable";
 import { useCanvasItemPanel } from "@/hooks/use-canvas-item-panel";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
-import { useLongImageGeneration } from "@/hooks/use-long-image-generation";
 import { CONTENT_SAVE_DEBOUNCE_MS } from "@/lib/canvas/constants";
-import { computeUpstreamDocumentCounts } from "@/lib/canvas/upstream-documents";
 import type { CanvasItemWithMessages } from "@/db/queries";
 import { deriveSkillStage } from "@/lib/skills/core/stage-engine";
-import { isLongImageSkill } from "@/lib/skills/long-image/state";
 import type { SerializableSkillManifest } from "@/lib/skills/serializable-manifest";
 import { cn } from "@/lib/utils";
 import type { ModelProviderId } from "@/lib/model-providers";
@@ -101,11 +98,6 @@ export function CanvasHome({
     [skillManifests],
   );
 
-  const upstreamDocumentCounts = useMemo(
-    () => computeUpstreamDocumentCounts(items, edges),
-    [items, edges],
-  );
-
   const activeItem = items.find((item) => item.id === activeItemId) ?? null;
   const activeManifest = activeItem ? manifestById.get(activeItem.skillId) : undefined;
 
@@ -141,28 +133,13 @@ export function CanvasHome({
     [itemPanel],
   );
 
-  const { startGeneration, revertGenerating, applyItemUpdate } =
-    useLongImageGeneration({
-      projectId,
-      modelProvider: modelOptions[0]?.provider,
-      onActivateItem: handleItemSelect,
-      setItems,
-    });
-
   const handleItemUpdate = useCallback(
     (itemId: string, output: SimpleSkillOutput) => {
-      const item = items.find((entry) => entry.id === itemId);
-
-      if (item && isLongImageSkill(item.skillId)) {
-        applyItemUpdate(itemId, output);
-        return;
-      }
-
       setItems((current) =>
         updateItemById(current, itemId, { state: output.state }),
       );
     },
-    [applyItemUpdate, items],
+    [],
   );
 
   const handleMessagesSync = useCallback(
@@ -170,17 +147,6 @@ export function CanvasHome({
       setItems((current) => updateItemById(current, itemId, { messages }));
     },
     [],
-  );
-
-  const handleLongImageGenerationRevert = useCallback(
-    (itemId: string) => {
-      const item = items.find((entry) => entry.id === itemId);
-
-      if (item && isLongImageSkill(item.skillId)) {
-        revertGenerating(itemId);
-      }
-    },
-    [items, revertGenerating],
   );
 
   const handleItemContentChange = useCallback(
@@ -314,11 +280,9 @@ export function CanvasHome({
               onItemDelete={handleItemDelete}
               onItemPositionChange={handleItemPositionChange}
               onItemContentChange={handleItemContentChange}
-              onItemGenerate={startGeneration}
               onEdgeAdd={handleEdgeAdd}
               onEdgeRemove={handleEdgeRemove}
               onToggleItemPanel={itemPanel.toggle}
-              upstreamDocumentCounts={upstreamDocumentCounts}
             />
           </ReactFlowProvider>
         </ResizablePanel>
@@ -352,7 +316,6 @@ export function CanvasHome({
                 modelOptions={modelOptions}
                 onItemUpdate={handleItemUpdate}
                 onMessagesSync={handleMessagesSync}
-                onGenerationRevert={handleLongImageGenerationRevert}
                 onClose={itemPanel.close}
               />
             </ResizablePanel>

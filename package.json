@@ -17,6 +17,8 @@
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.48",
     "@ai-sdk/react": "^3.0.197",
+    "@langchain/core": "^1.1.48",
+    "@langchain/langgraph": "^1.3.6",
     "@platejs/basic-nodes": "^53.0.0",
     "@platejs/indent": "^53.0.0",
     "@platejs/list": "^53.0.0",

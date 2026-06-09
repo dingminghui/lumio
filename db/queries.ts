@@ -289,21 +289,20 @@ export async function updateCanvasItemState(
   itemId: string,
   state: Record<string, unknown>,
 ) {
-  const item = await getCanvasItem(itemId);
+  const [updatedItem] = await db
+    .update(canvasItems)
+    .set({ state, updatedAt: sql`now()` })
+    .where(eq(canvasItems.id, itemId))
+    .returning({ projectId: canvasItems.projectId });
 
-  if (!item) {
+  if (!updatedItem) {
     throw new Error("Canvas item not found");
   }
 
   await db
-    .update(canvasItems)
-    .set({ state, updatedAt: sql`now()` })
-    .where(eq(canvasItems.id, itemId));
-
-  await db
     .update(projects)
     .set({ updatedAt: sql`now()` })
-    .where(eq(projects.id, item.projectId));
+    .where(eq(projects.id, updatedItem.projectId));
 }
 
 export async function updateCanvasItemPosition(
@@ -313,31 +312,36 @@ export async function updateCanvasItemPosition(
   width: number,
   height: number,
 ) {
-  const item = await getCanvasItem(itemId);
-
-  if (!item) {
-    throw new Error("Canvas item not found");
-  }
-
-  await db
+  const [updatedItem] = await db
     .update(canvasItems)
     .set({ positionX, positionY, width, height, updatedAt: sql`now()` })
-    .where(eq(canvasItems.id, itemId));
-}
+    .where(eq(canvasItems.id, itemId))
+    .returning({ projectId: canvasItems.projectId });
 
-export async function deleteCanvasItem(itemId: string) {
-  const item = await getCanvasItem(itemId);
-
-  if (!item) {
+  if (!updatedItem) {
     throw new Error("Canvas item not found");
   }
-
-  await db.delete(canvasItems).where(eq(canvasItems.id, itemId));
 
   await db
     .update(projects)
     .set({ updatedAt: sql`now()` })
-    .where(eq(projects.id, item.projectId));
+    .where(eq(projects.id, updatedItem.projectId));
+}
+
+export async function deleteCanvasItem(itemId: string) {
+  const [deletedItem] = await db
+    .delete(canvasItems)
+    .where(eq(canvasItems.id, itemId))
+    .returning({ projectId: canvasItems.projectId });
+
+  if (!deletedItem) {
+    throw new Error("Canvas item not found");
+  }
+
+  await db
+    .update(projects)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(projects.id, deletedItem.projectId));
 }
 
 export async function listCanvasItems(projectId: string) {
@@ -372,10 +376,12 @@ export async function listItemMessages(itemId: string) {
 
 export async function createItemMessage({
   itemId,
+  projectId,
   role,
   content,
 }: {
   itemId: string;
+  projectId?: string;
   role: StoredMessageRole;
   content: string;
 }) {
@@ -385,9 +391,9 @@ export async function createItemMessage({
     throw new Error("Message content is required");
   }
 
-  const item = await getCanvasItem(itemId);
+  const resolvedProjectId = projectId ?? (await getCanvasItem(itemId))?.projectId;
 
-  if (!item) {
+  if (!resolvedProjectId) {
     throw new Error("Canvas item not found");
   }
 
@@ -409,7 +415,7 @@ export async function createItemMessage({
   await db
     .update(projects)
     .set({ updatedAt: sql`now()` })
-    .where(eq(projects.id, item.projectId));
+    .where(eq(projects.id, resolvedProjectId));
 
   return {
     id: message.id,
@@ -421,18 +427,20 @@ export async function createItemMessage({
 
 export async function replaceItemMessages({
   itemId,
+  projectId,
   messages,
 }: {
   itemId: string;
+  projectId?: string;
   messages: StoredTextMessage[];
 }) {
   const persistedMessages = messages
     .map((m) => ({ ...m, content: m.content.trim() }))
     .filter((m) => m.content.length > 0);
 
-  const item = await getCanvasItem(itemId);
+  const resolvedProjectId = projectId ?? (await getCanvasItem(itemId))?.projectId;
 
-  if (!item) {
+  if (!resolvedProjectId) {
     throw new Error("Canvas item not found");
   }
 
@@ -468,7 +476,7 @@ export async function replaceItemMessages({
     await tx
       .update(projects)
       .set({ updatedAt: sql`now()` })
-      .where(eq(projects.id, item.projectId));
+      .where(eq(projects.id, resolvedProjectId));
 
     return inserted.map((m) => ({
       id: m.id,
