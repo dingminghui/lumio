@@ -6,7 +6,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
-  useStoreApi,
+
   type Connection,
   type EdgeChange,
   type Node,
@@ -33,10 +33,13 @@ import {
   type NodeInteractionHandlers,
 } from "@/lib/canvas/flow-mapper";
 import {
-  applyDocumentEditLayoutToNode,
-  clearDocumentEditLayoutAnimation,
+  captureDocumentEditSnapshot,
+  type DocumentEditSnapshot,
+  DOCUMENT_EDIT_FIT_PADDING_X,
+  DOCUMENT_EDIT_FIT_PADDING_Y,
   DOCUMENT_EDIT_LAYOUT_ANIMATION_MS,
-  getDocumentEditLayout,
+  enterDocumentEditState,
+  exitDocumentEditState,
 } from "@/lib/canvas/document-node-focus";
 import { NODE_DEFAULT_HEIGHT } from "@/lib/canvas/node-layout";
 import type { CanvasItemWithMessages } from "@/db/queries";
@@ -87,6 +90,7 @@ export function useFlowCanvasState({
   onEdgeRemove,
 }: UseFlowCanvasStateOptions) {
   const hasAutoFitRef = useRef(false);
+  const documentEditSnapshotsRef = useRef<Map<string, DocumentEditSnapshot>>(new Map());
   const scheduleLayoutSave = useDebouncedCallback(LAYOUT_SAVE_DEBOUNCE_MS);
   const scheduleViewportSave = useDebouncedCallback(VIEWPORT_SAVE_DEBOUNCE_MS);
 
@@ -104,7 +108,7 @@ export function useFlowCanvasState({
 
   const { fitView, getNode, getViewport, setViewport, zoomIn, zoomOut } =
     useReactFlow();
-  const store = useStoreApi();
+
 
   const updateNodeSize = useCallback(
     (itemId: string, width: number, height: number) => {
@@ -212,57 +216,53 @@ export function useFlowCanvasState({
         return;
       }
 
-      const { width: containerWidth, height: containerHeight } = store.getState();
-      const { zoom } = getViewport();
-      const layout = getDocumentEditLayout(node, {
-        width: containerWidth,
-        height: containerHeight,
-        zoom,
-      });
+      if (!documentEditSnapshotsRef.current.has(itemId)) {
+        documentEditSnapshotsRef.current.set(
+          itemId,
+          captureDocumentEditSnapshot(node, getViewport()),
+        );
+      }
 
       setNodes((current) =>
         current.map((entry) =>
-          entry.id === itemId ? applyDocumentEditLayoutToNode(entry, layout) : entry,
+          entry.id === itemId ? enterDocumentEditState(entry) : entry,
         ),
       );
 
-      const finishLayoutAnimation = () => {
-        setNodes((current) =>
-          current.map((entry) =>
-            entry.id === itemId ? clearDocumentEditLayoutAnimation(entry) : entry,
-          ),
-        );
-
-        persistItemLayout(
-          itemId,
-          layout.position.x,
-          layout.position.y,
-          layout.width,
-          layout.height,
-        );
-        persistViewport(getViewport());
-      };
-
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          void fitView({
-            nodes: [{ id: itemId }],
-            padding: 0.2,
-            duration: DOCUMENT_EDIT_LAYOUT_ANIMATION_MS,
-            maxZoom: 1.12,
-          }).then(finishLayoutAnimation);
-        });
+        void fitView({
+          nodes: [{ id: itemId }],
+          padding: { x: DOCUMENT_EDIT_FIT_PADDING_X, y: DOCUMENT_EDIT_FIT_PADDING_Y },
+          duration: DOCUMENT_EDIT_LAYOUT_ANIMATION_MS,
+        }).then(() => persistViewport(getViewport()));
       });
     },
-    [
-      fitView,
-      getNode,
-      getViewport,
-      persistItemLayout,
-      persistViewport,
-      setNodes,
-      store,
-    ],
+    [fitView, getNode, getViewport, persistViewport, setNodes],
+  );
+
+  const restoreNodeAfterDocumentEdit = useCallback(
+    (itemId: string) => {
+      const snapshot = documentEditSnapshotsRef.current.get(itemId);
+
+      if (!snapshot) {
+        return;
+      }
+
+      documentEditSnapshotsRef.current.delete(itemId);
+
+      setNodes((current) =>
+        current.map((entry) =>
+          entry.id === itemId ? exitDocumentEditState(entry, snapshot) : entry,
+        ),
+      );
+
+      requestAnimationFrame(() => {
+        void setViewport(snapshot.viewport, {
+          duration: DOCUMENT_EDIT_LAYOUT_ANIMATION_MS,
+        }).then(() => persistViewport(getViewport()));
+      });
+    },
+    [getViewport, persistViewport, setNodes, setViewport],
   );
 
   const startDocumentEdit = useCallback(
@@ -273,14 +273,28 @@ export function useFlowCanvasState({
     [focusNodeForDocumentEdit, selectCanvasItem],
   );
 
+  const endDocumentEdit = useCallback(
+    (itemId: string) => {
+      restoreNodeAfterDocumentEdit(itemId);
+    },
+    [restoreNodeAfterDocumentEdit],
+  );
+
   const nodeHandlers = useMemo<NodeInteractionHandlers>(
     () => ({
       onResize: updateNodeSize,
       onResizeEnd: handleResizeEnd,
       onContentChange: onItemContentChange,
       onStartDocumentEdit: startDocumentEdit,
+      onEndDocumentEdit: endDocumentEdit,
     }),
-    [handleResizeEnd, onItemContentChange, startDocumentEdit, updateNodeSize],
+    [
+      endDocumentEdit,
+      handleResizeEnd,
+      onItemContentChange,
+      startDocumentEdit,
+      updateNodeSize,
+    ],
   );
 
   useEffect(() => {

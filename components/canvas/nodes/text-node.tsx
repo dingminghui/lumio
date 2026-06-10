@@ -50,6 +50,7 @@ export type TextNodeData = {
   onResizeEnd?: (width: number, height: number) => void;
   onContentChange?: (content: string) => void;
   onStartDocumentEdit?: () => void;
+  onEndDocumentEdit?: () => void;
 };
 
 function getDocumentStats(markdown: string): DocumentStats {
@@ -100,10 +101,14 @@ export function TextNode({ data, selected }: NodeProps) {
     [isActiveEdit, nodeData],
   );
 
-  const handleEditEnd = useCallback((event?: React.MouseEvent) => {
-    event?.stopPropagation();
-    setIsEditing(false);
-  }, []);
+  const handleEditEnd = useCallback(
+    (event?: React.MouseEvent) => {
+      event?.stopPropagation();
+      setIsEditing(false);
+      nodeData.onEndDocumentEdit?.();
+    },
+    [nodeData],
+  );
 
   const handleCardBlurCapture = useCallback(
     (event: React.FocusEvent<HTMLDivElement>) => {

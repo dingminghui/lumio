@@ -10,6 +10,7 @@ export type NodeInteractionHandlers = {
   onResizeEnd: (itemId: string, width: number, height: number) => void;
   onContentChange: (itemId: string, content: string) => void;
   onStartDocumentEdit: (itemId: string) => void;
+  onEndDocumentEdit: (itemId: string) => void;
 };
 
 export const NOOP_NODE_HANDLERS: NodeInteractionHandlers = {
@@ -17,6 +18,7 @@ export const NOOP_NODE_HANDLERS: NodeInteractionHandlers = {
   onResizeEnd: () => {},
   onContentChange: () => {},
   onStartDocumentEdit: () => {},
+  onEndDocumentEdit: () => {},
 };
 
 function getEdgeClassName(edge: CanvasEdgeRow, activeItemId: string | null) {
@@ -126,6 +128,11 @@ export function itemsToNodes(
         onStartDocumentEdit: isDocumentSkill(item.skillId)
           ? () => {
               handlers.onStartDocumentEdit(item.id);
+            }
+          : undefined,
+        onEndDocumentEdit: isDocumentSkill(item.skillId)
+          ? () => {
+              handlers.onEndDocumentEdit(item.id);
             }
           : undefined,
       },
