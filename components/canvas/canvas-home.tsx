@@ -126,14 +126,22 @@ export function CanvasHome({
 
   const handleItemContentChange = useCallback(
     (itemId: string, content: string) => {
-      setItems((current) =>
-        current.map((item) =>
-          item.id === itemId ? { ...item, state: { ...item.state, content } } : item,
-        ),
-      );
+      let mergedState: Record<string, unknown> = { content };
+
+      setItems((current) => {
+        const existing = current.find((item) => item.id === itemId);
+
+        if (existing) {
+          mergedState = { ...existing.state, content };
+        }
+
+        return current.map((item) =>
+          item.id === itemId ? { ...item, state: mergedState } : item,
+        );
+      });
 
       scheduleContentSave(() => {
-        void updateCanvasItemStateAction(itemId, { content });
+        void updateCanvasItemStateAction(itemId, mergedState);
       });
     },
     [scheduleContentSave],

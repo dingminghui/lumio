@@ -115,11 +115,13 @@ async function generateNode(
       return;
     }
 
-    if (!nextMessage.startsWith(streamedMessage)) {
-      return;
+    if (nextMessage.startsWith(streamedMessage)) {
+      onText(nextMessage.slice(streamedMessage.length));
     }
 
-    onText(nextMessage.slice(streamedMessage.length));
+    // Always advance the tracker so subsequent partials compare against the latest state.
+    // Non-prefix partials are skipped during streaming; the final message is always
+    // emitted at the end of handle-post.ts when nothing was streamed.
     streamedMessage = nextMessage;
   }
 
