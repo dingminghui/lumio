@@ -26,18 +26,10 @@ export function createAnswerSystemPrompt(
   manifest: SkillManifest,
   itemState: Record<string, unknown>,
 ) {
-  return `你是 Lumio 的节点会话助手。请用中文自然回答用户的问题。
+  return `你是"${manifest.name}"节点的问答助手，用中文简洁回答用户问题。
 
-当前节点：
-- skillId: ${manifest.id}
-- skillName: ${manifest.name}
-- description: ${manifest.description}
+节点功能：${manifest.description}
+当前状态：${JSON.stringify(itemState)}
 
-当前节点状态：
-${JSON.stringify(itemState, null, 2)}
-
-规则：
-- 只回答用户问题，不输出 JSON。
-- 不要声称已经修改、保存或写入节点——你无法执行这些操作。
-- 如果用户想调用的能力不属于当前节点，简短说明应该切换到对应节点。`;
+规则：不输出 JSON，不声称已修改或写入节点。`;
 }

@@ -6,49 +6,21 @@ import {
 } from "@/lib/skills/node-chat-schema";
 import type { SkillManifest } from "@/types/skill";
 
-function createDecisionSystemPrompt({
-  manifest,
-  itemState,
-}: {
-  manifest: SkillManifest;
-  itemState: Record<string, unknown>;
-}) {
-  return `你是 Lumio 节点会话的动作路由器。你只判断本轮用户消息应该做什么，不生成最终节点内容。
+function createDecisionSystemPrompt({ manifest }: { manifest: SkillManifest }) {
+  return `你是对话路由器，判断用户意图并输出 JSON。
 
-当前节点：
-- skillId: ${manifest.id}
-- skillName: ${manifest.name}
-- description: ${manifest.description}
+节点：${manifest.name}——${manifest.description}
 
-当前节点状态：
-${JSON.stringify(itemState, null, 2)}
+action 取值：
+- update_node：用户要生成、修改、保存、写入节点内容
+- answer：用户在提问或咨询
 
-action 只能是：
-- answer：用户只是提问、咨询、解释、评估、建议，或请求不属于当前节点能力。
-- update_node：用户要求生成、创建、修改、整理、优化、保存或写入当前节点内容。
+示例：
+- "写一篇文章" / "把故事写入节点" / "写入文档" / "保存" → update_node
+- "这篇写得好吗" / "节点能做什么" / "帮我新建节点" → answer
 
-write 只能是：
-- answer 使用 "none"。
-- update_node 使用 "commit"。
-
-判定规则（按优先级）：
-1. 用户明确说"写入节点"、"写入文档"、"保存"、"写入"、"提交"、"更新节点"、"把…写入"等持久化意图时，用 update_node。
-2. 用户要求生成、起草、修订、扩写、优化文档内容时，用 update_node。
-3. 用户提问、咨询、寻求建议，或询问节点的状态/能力时，用 answer。
-4. 用户要求新建画布节点、连接节点、跨节点编排等画布操作（而非编辑节点内容）时，用 answer。
-
-示例（直接参考，不要偏离）：
-- "写一篇关于 XX 的文章" → update_node
-- "把上面的故事写入当前节点" → update_node
-- "请把这段内容写入文档" → update_node
-- "写入节点" → update_node
-- "写入文档" → update_node
-- "保存" → update_node
-- "这篇文章写得好吗？" → answer
-- "这个节点能做什么？" → answer
-- "帮我新建一个节点" → answer
-
-以 JSON 格式输出结果，message 用一句中文说明判断。`;
+输出 JSON：{ "action": "answer"|"update_node", "write": "none"|"commit", "message": "一句中文说明" }
+write 与 action 对应：answer→none，update_node→commit。`;
 }
 
 function normalizeDecision(decision: NodeChatDecision): NodeChatDecision {
@@ -63,18 +35,17 @@ export async function decideNodeChatAction({
   model,
   messages,
   manifest,
-  itemState,
 }: {
   model: LanguageModel;
   messages: ModelMessage[];
   manifest: SkillManifest;
-  itemState: Record<string, unknown>;
+  itemState?: Record<string, unknown>;
   latestUserMessage?: string;
 }): Promise<NodeChatDecision> {
   try {
     const result = await generateText({
       model,
-      system: createDecisionSystemPrompt({ manifest, itemState }),
+      system: createDecisionSystemPrompt({ manifest }),
       messages,
       output: Output.object({
         schema: nodeChatDecisionSchema,
