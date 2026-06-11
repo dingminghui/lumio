@@ -36,6 +36,10 @@ const DocumentState = Annotation.Root({
     reducer: (_, b) => b,
   }),
   latestUserMessage: Annotation<string>({ default: () => "", reducer: (_, b) => b }),
+  upstreamContext: Annotation<string | undefined>({
+    default: () => undefined,
+    reducer: (_, b) => b,
+  }),
   decision: Annotation<NodeChatDecision | null>({
     default: () => null,
     reducer: (_, b) => b,
@@ -133,6 +137,7 @@ async function generateNode(
       system: createSkillSystemPrompt({
         manifest: state.manifest,
         itemState: state.itemState,
+        context: state.upstreamContext,
       }),
       messages: state.messages,
       onPartialMessage: writeMessage,

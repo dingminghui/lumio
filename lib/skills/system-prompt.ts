@@ -11,7 +11,7 @@ export function createSkillSystemPrompt({
 }) {
   return `${manifest.prompts.system}
 
-${context ? `额外上下文：\n${context}\n` : ""}
+${context ? `上游节点内容（来自画布连线）：\n${context}\n` : ""}
 
 当前节点状态（JSON）：
 ${JSON.stringify(itemState, null, 2)}

@@ -5,7 +5,13 @@ import {
 } from "ai";
 
 import type { ChatRequestBody, RouteContext } from "./typings";
-import { createItemMessage, getCanvasItem, updateCanvasItemState } from "@/db/queries";
+import {
+  createItemMessage,
+  getCanvasItem,
+  getUpstreamItems,
+  updateCanvasItemState,
+} from "@/db/queries";
+import { buildUpstreamContext } from "@/lib/skills/upstream-context";
 import { documentGraph } from "@/lib/graph/document-graph";
 import { createConfiguredProvider } from "@/lib/model-providers";
 import { getServerModelConfig } from "@/lib/server-model-config";
@@ -46,6 +52,9 @@ export async function handleItemChatPost(request: Request, { params }: RouteCont
   if (!item || item.projectId !== projectId) {
     return Response.json({ error: "Canvas item not found" }, { status: 404 });
   }
+
+  const upstreamItems = await getUpstreamItems(itemId, projectId);
+  const upstreamContext = buildUpstreamContext(upstreamItems);
 
   const manifest = registry.get(item.skillId) ?? registry.getBuiltinFallback();
   const latestUserMessage = [...messages]
@@ -111,6 +120,7 @@ export async function handleItemChatPost(request: Request, { params }: RouteCont
           itemState: item.state,
           model,
           latestUserMessage: userContent,
+          upstreamContext,
         },
         { configurable: { onText: writeDelta } },
       );

@@ -486,3 +486,29 @@ export async function replaceItemMessages({
     }));
   });
 }
+
+export async function getUpstreamItems(
+  itemId: string,
+  projectId: string,
+): Promise<CanvasItemRow[]> {
+  const edges = await db
+    .select({ sourceItemId: canvasEdges.sourceItemId })
+    .from(canvasEdges)
+    .where(
+      and(
+        eq(canvasEdges.targetItemId, itemId),
+        eq(canvasEdges.projectId, projectId),
+      ),
+    );
+
+  if (!edges.length) return [];
+
+  const sourceIds = edges.map((e) => e.sourceItemId);
+
+  const items = await db
+    .select()
+    .from(canvasItems)
+    .where(inArray(canvasItems.id, sourceIds));
+
+  return items.map(mapCanvasItem);
+}
