@@ -9,14 +9,6 @@ const LAYOUT_ANIMATION_BUFFER_MS = 48;
 export const DOCUMENT_EDIT_FOCUS_DELAY_MS =
   DOCUMENT_EDIT_LAYOUT_ANIMATION_MS + LAYOUT_ANIMATION_BUFFER_MS;
 
-/**
- * fitView padding：宽度约占 80%，高度约占 75%
- * 宽 padding = (1/0.8 - 1) / 2 = 0.125
- * 高 padding = (1/0.75 - 1) / 2 ≈ 0.167
- */
-export const DOCUMENT_EDIT_FIT_PADDING_X = 0.125;
-export const DOCUMENT_EDIT_FIT_PADDING_Y = 0.167;
-
 /** 编辑态 zIndex，确保节点置于其他节点之上 */
 export const DOCUMENT_EDIT_NODE_Z_INDEX = 1000;
 
@@ -25,6 +17,9 @@ const DOCUMENT_EDITING_CLASS = "lumio-text-node--document-editing";
 export type DocumentEditSnapshot = {
   zIndex?: number;
   className?: string;
+  width: number | undefined;
+  height: number | undefined;
+  style: React.CSSProperties | undefined;
   viewport: Viewport;
 };
 
@@ -43,20 +38,41 @@ export function captureDocumentEditSnapshot(
   return {
     zIndex: node.zIndex,
     className: cleanClassName(node.className),
+    width: node.width,
+    height: node.height,
+    style: node.style ? { ...node.style } : undefined,
     viewport: { ...viewport },
   };
 }
 
-export function enterDocumentEditState(node: Node): Node {
+export function enterDocumentEditState(
+  node: Node,
+  targetWidth: number,
+  targetHeight: number,
+): Node {
   const base = cleanClassName(node.className) ?? "";
   const className = [base, DOCUMENT_EDITING_CLASS].filter(Boolean).join(" ");
 
-  return { ...node, zIndex: DOCUMENT_EDIT_NODE_Z_INDEX, className };
+  return {
+    ...node,
+    zIndex: DOCUMENT_EDIT_NODE_Z_INDEX,
+    className,
+    width: targetWidth,
+    height: targetHeight,
+    style: { ...node.style, width: targetWidth, height: targetHeight },
+  };
 }
 
 export function exitDocumentEditState(
   node: Node,
   snapshot: DocumentEditSnapshot,
 ): Node {
-  return { ...node, zIndex: snapshot.zIndex, className: snapshot.className };
+  return {
+    ...node,
+    zIndex: snapshot.zIndex,
+    className: snapshot.className,
+    width: snapshot.width,
+    height: snapshot.height,
+    style: snapshot.style,
+  };
 }

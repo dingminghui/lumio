@@ -6,7 +6,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
-
+  useStore,
   type Connection,
   type EdgeChange,
   type Node,
@@ -35,8 +35,6 @@ import {
 import {
   captureDocumentEditSnapshot,
   type DocumentEditSnapshot,
-  DOCUMENT_EDIT_FIT_PADDING_X,
-  DOCUMENT_EDIT_FIT_PADDING_Y,
   DOCUMENT_EDIT_LAYOUT_ANIMATION_MS,
   enterDocumentEditState,
   exitDocumentEditState,
@@ -106,8 +104,12 @@ export function useFlowCanvasState({
   const [showDots, setShowDots] = useState(initialShowDots ?? DEFAULT_SHOW_DOTS);
   const [showMinimap, setShowMinimap] = useState(false);
 
-  const { fitView, getNode, getViewport, setViewport, zoomIn, zoomOut } =
+  const { fitView, getNode, getViewport, setCenter, setViewport, zoomIn, zoomOut } =
     useReactFlow();
+
+  // Actual ReactFlow container pixel dimensions (excludes any sidebars/panels).
+  const rfWidth = useStore((s) => s.width);
+  const rfHeight = useStore((s) => s.height);
 
 
   const updateNodeSize = useCallback(
@@ -216,28 +218,41 @@ export function useFlowCanvasState({
         return;
       }
 
+      const viewport = getViewport();
+
       if (!documentEditSnapshotsRef.current.has(itemId)) {
         documentEditSnapshotsRef.current.set(
           itemId,
-          captureDocumentEditSnapshot(node, getViewport()),
+          captureDocumentEditSnapshot(node, viewport),
         );
       }
 
+      // Always enter edit mode at zoom=1 so text is readable.
+      // At zoom=1, canvas units equal screen pixels, so node size is simply
+      // rfWidth/rfHeight multiplied by the fill ratio.
+      const EDIT_ZOOM = 1;
+      const targetWidth = rfWidth * 0.8;
+      const targetHeight = rfHeight * 0.75;
+
       setNodes((current) =>
         current.map((entry) =>
-          entry.id === itemId ? enterDocumentEditState(entry) : entry,
+          entry.id === itemId
+            ? enterDocumentEditState(entry, targetWidth, targetHeight)
+            : entry,
         ),
       );
 
+      const centerX = node.position.x + targetWidth / 2;
+      const centerY = node.position.y + targetHeight / 2;
+
       requestAnimationFrame(() => {
-        void fitView({
-          nodes: [{ id: itemId }],
-          padding: { x: DOCUMENT_EDIT_FIT_PADDING_X, y: DOCUMENT_EDIT_FIT_PADDING_Y },
+        void setCenter(centerX, centerY, {
+          zoom: EDIT_ZOOM,
           duration: DOCUMENT_EDIT_LAYOUT_ANIMATION_MS,
         }).then(() => persistViewport(getViewport()));
       });
     },
-    [fitView, getNode, getViewport, persistViewport, setNodes],
+    [getNode, getViewport, persistViewport, rfHeight, rfWidth, setCenter, setNodes],
   );
 
   const restoreNodeAfterDocumentEdit = useCallback(
