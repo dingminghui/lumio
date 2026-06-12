@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import {
   createCanvasEdge,
   createCanvasItem,
+  createProject,
   deleteCanvasEdge,
   deleteCanvasItem,
   deleteProject,
@@ -90,4 +91,10 @@ export async function deleteCanvasEdgeAction(edgeId: string) {
 export async function deleteProjectAction(projectId: string) {
   await deleteProject(projectId);
   revalidatePath("/projects");
+}
+
+export async function createProjectAction(name?: string) {
+  const project = await createProject({ name });
+  revalidatePath("/projects");
+  return project;
 }
