@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 
+import { DOCUMENT_SKILL_ID } from "@/lib/skills/skill-ids";
 import type { SkillManifest } from "@/types/skill";
 
 import systemPrompt from "./system-prompt.md";
@@ -7,7 +8,7 @@ import systemPrompt from "./system-prompt.md";
 export const documentManifest: SkillManifest = {
   source: "builtin",
   version: "1.0.0",
-  id: "document",
+  id: DOCUMENT_SKILL_ID,
   name: "文档生成",
   description: "通过对话生成 Markdown 文档，支持起草、编辑与导出准备。",
   category: "document",

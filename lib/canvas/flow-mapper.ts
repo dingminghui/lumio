@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 
 import type { CanvasItemWithMessages } from "@/db/queries";
-import { isDocumentSkill } from "@/lib/canvas/node-content";
+import { isMarkdownEditableSkill } from "@/lib/canvas/node-content";
 import { NODE_DEFAULT_HEIGHT } from "@/lib/canvas/node-layout";
 import type { CanvasEdgeRow } from "@/types/skill";
 
@@ -120,17 +120,17 @@ export function itemsToNodes(
         onResizeEnd: (width: number, nodeHeight: number) => {
           handlers.onResizeEnd(item.id, width, nodeHeight);
         },
-        onContentChange: isDocumentSkill(item.skillId)
+        onContentChange: isMarkdownEditableSkill(item.skillId)
           ? (content: string) => {
               handlers.onContentChange(item.id, content);
             }
           : undefined,
-        onStartDocumentEdit: isDocumentSkill(item.skillId)
+        onStartDocumentEdit: isMarkdownEditableSkill(item.skillId)
           ? () => {
               handlers.onStartDocumentEdit(item.id);
             }
           : undefined,
-        onEndDocumentEdit: isDocumentSkill(item.skillId)
+        onEndDocumentEdit: isMarkdownEditableSkill(item.skillId)
           ? () => {
               handlers.onEndDocumentEdit(item.id);
             }

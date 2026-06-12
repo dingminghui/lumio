@@ -12,9 +12,8 @@ import { Button } from "@/components/ui/button";
 import { MessageResponse } from "@/components/ai-elements/message";
 import { handleNodeContentWheel } from "@/lib/canvas/node-wheel";
 import {
-  getDocumentMarkdown,
-  getFallbackNodeContent,
-  isDocumentSkill,
+  getNodeMarkdownContent,
+  isMarkdownEditableSkill,
 } from "@/lib/canvas/node-content";
 import {
   NODE_MAX_HEIGHT,
@@ -75,14 +74,13 @@ function getDocumentStats(markdown: string): DocumentStats {
 
 export function TextNode({ data, selected }: NodeProps) {
   const nodeData = data as TextNodeData;
-  const isDocumentNode = isDocumentSkill(nodeData.skillId);
-  const documentMarkdown = getDocumentMarkdown(nodeData.state);
-  const fallbackContent = getFallbackNodeContent(nodeData.state);
+  const isMarkdownEditableNode = isMarkdownEditableSkill(nodeData.skillId);
+  const nodeMarkdown = getNodeMarkdownContent(nodeData.skillId, nodeData.state);
   const [isEditing, setIsEditing] = useState(false);
   const nodeCardRef = useRef<HTMLDivElement>(null);
   const documentStats = useMemo(
-    () => getDocumentStats(documentMarkdown),
-    [documentMarkdown],
+    () => getDocumentStats(nodeMarkdown),
+    [nodeMarkdown],
   );
 
   const isActiveEdit = selected && isEditing;
@@ -153,7 +151,7 @@ export function TextNode({ data, selected }: NodeProps) {
           <Badge variant="secondary" className="w-fit text-xs">
             {nodeData.skillName}
           </Badge>
-          {isDocumentNode && isActiveEdit ? (
+          {isMarkdownEditableNode && isActiveEdit ? (
             <Button
               type="button"
               variant="secondary"
@@ -164,14 +162,14 @@ export function TextNode({ data, selected }: NodeProps) {
               <Check className="size-3" />
               完成
             </Button>
-          ) : isDocumentNode ? (
+          ) : isMarkdownEditableNode ? (
             <Button
               type="button"
               variant="ghost"
               size="icon"
               className="nodrag size-5 shrink-0"
-              aria-label="编辑文档"
-              title="编辑文档"
+              aria-label="编辑内容"
+              title="编辑内容"
               onClick={handleStartEdit}
             >
               <PencilLine className="size-3.5" />
@@ -180,22 +178,22 @@ export function TextNode({ data, selected }: NodeProps) {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-3 pt-2 pb-2">
-          {isDocumentNode ? (
+          {isMarkdownEditableNode ? (
             <DocumentPlateEditor
-              markdown={documentMarkdown}
+              markdown={nodeMarkdown}
               editable={isActiveEdit}
               onContentChange={nodeData.onContentChange}
             />
-          ) : fallbackContent ? (
+          ) : nodeMarkdown ? (
             <div
               className={cn(
                 LUMIO_SCROLLBAR_CLASS,
-                "nodrag nowheel min-h-0 flex-1 overflow-y-auto text-sm",
+                "min-h-0 flex-1 overflow-y-auto text-sm",
               )}
               onWheel={handleNodeContentWheel}
             >
               <MessageResponse className="prose prose-sm dark:prose-invert max-w-none">
-                {fallbackContent}
+                {nodeMarkdown}
               </MessageResponse>
             </div>
           ) : (
@@ -205,7 +203,7 @@ export function TextNode({ data, selected }: NodeProps) {
           )}
         </div>
 
-        {isDocumentNode ? (
+        {isMarkdownEditableNode ? (
           <div className="flex shrink-0 justify-end border-t border-border/50 px-3 py-1.5 text-[11px] leading-none text-muted-foreground">
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
               <span>{isActiveEdit ? "编辑中" : "只读"}</span>

@@ -19,6 +19,10 @@ import {
 import { useCanvasItemPanel } from "@/hooks/use-canvas-item-panel";
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback";
 import { CONTENT_SAVE_DEBOUNCE_MS } from "@/lib/canvas/constants";
+import {
+  isOutlineSkill,
+  parseOutlineMarkdown,
+} from "@/lib/canvas/node-content";
 import type { CanvasItemWithMessages } from "@/db/queries";
 import { deriveSkillStage } from "@/lib/skills/core/stage-engine";
 import type { SerializableSkillManifest } from "@/lib/skills/serializable-manifest";
@@ -132,7 +136,9 @@ export function CanvasHome({
         const existing = current.find((item) => item.id === itemId);
 
         if (existing) {
-          mergedState = { ...existing.state, content };
+          mergedState = isOutlineSkill(existing.skillId)
+            ? { ...existing.state, sections: parseOutlineMarkdown(content) }
+            : { ...existing.state, content };
         }
 
         return current.map((item) =>
