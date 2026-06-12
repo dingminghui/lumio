@@ -1,14 +1,13 @@
 import { AppShell } from "@/components/app-shell";
 import { CreateProjectDialog } from "@/components/projects/create-project-dialog";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProjectList } from "@/components/projects/project-list";
 import { listProjects } from "@/db/queries";
-import Link from "next/link";
-import { formatDateTime } from "@/utils/date";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsRoute() {
   const projects = await listProjects();
+
   return (
     <AppShell>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -22,33 +21,7 @@ export default async function ProjectsRoute() {
           <CreateProjectDialog />
         </header>
 
-        {projects.length ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project) => (
-              <Link
-                key={project.id}
-                href={`/projects/${project.id}`}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={`打开项目 ${project.name}`}
-                className="block rounded-xl transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-              >
-                <Card className="transition-colors hover:bg-muted/50">
-                  <CardHeader>
-                    <CardTitle className="truncate">{project.name}</CardTitle>
-                    <CardDescription>
-                      更新于 {formatDateTime(project.updatedAt)}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="flex min-h-72 items-center justify-center text-sm text-muted-foreground">
-            暂无项目
-          </div>
-        )}
+        <ProjectList projects={projects} />
       </div>
     </AppShell>
   );

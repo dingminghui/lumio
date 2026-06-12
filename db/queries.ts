@@ -10,7 +10,7 @@ import type { StoredMessageRole, StoredTextMessage } from "@/utils/session-messa
 export type ProjectListItem = {
   id: string;
   name: string;
-  updatedAt: Date;
+  createdAt: Date;
 };
 
 export type ProjectDetailProject = {
@@ -81,10 +81,14 @@ export async function listProjects(): Promise<ProjectListItem[]> {
     .select({
       id: projects.id,
       name: projects.name,
-      updatedAt: projects.updatedAt,
+      createdAt: projects.createdAt,
     })
     .from(projects)
-    .orderBy(desc(projects.updatedAt));
+    .orderBy(desc(projects.createdAt));
+}
+
+export async function deleteProject(projectId: string) {
+  await db.delete(projects).where(eq(projects.id, projectId));
 }
 
 export async function getProjectDetail(projectId: string) {
@@ -232,7 +236,6 @@ export async function updateProjectViewport(
       ...(data.bgColor !== undefined ? { bgColor: data.bgColor } : {}),
       ...(data.showDots !== undefined ? { showDots: data.showDots } : {}),
       ...(data.name !== undefined ? { name: data.name } : {}),
-      updatedAt: sql`now()`,
     })
     .where(eq(projects.id, projectId));
 }

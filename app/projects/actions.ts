@@ -1,10 +1,13 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import {
   createCanvasEdge,
   createCanvasItem,
   deleteCanvasEdge,
   deleteCanvasItem,
+  deleteProject,
   replaceItemMessages,
   updateCanvasItemPosition,
   updateCanvasItemState,
@@ -82,4 +85,9 @@ export async function createCanvasEdgeAction(
 
 export async function deleteCanvasEdgeAction(edgeId: string) {
   await deleteCanvasEdge(edgeId);
+}
+
+export async function deleteProjectAction(projectId: string) {
+  await deleteProject(projectId);
+  revalidatePath("/projects");
 }
